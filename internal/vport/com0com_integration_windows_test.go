@@ -13,40 +13,40 @@ import (
 	"go.bug.st/serial"
 )
 
-func openDriverPair(t *testing.T) (Port, serial.Port) {
-	t.Helper()
+func openDriverPair(test *testing.T) (Port, serial.Port) {
+	test.Helper()
 	path := os.Getenv("LINKPORT_TEST_COM0COM_PATH")
 	pair := os.Getenv("LINKPORT_TEST_COM0COM_PAIR")
 	if path == "" || pair == "" {
 		if os.Getenv("LINKPORT_TEST_COM0COM_REQUIRED") == "1" {
-			t.Fatal("real driver testing requires LINKPORT_TEST_COM0COM_PATH and LINKPORT_TEST_COM0COM_PAIR")
+			test.Fatal("real driver testing requires LINKPORT_TEST_COM0COM_PATH and LINKPORT_TEST_COM0COM_PAIR")
 		}
-		t.Skip("set both dedicated com0com test endpoints to run driver integration")
+		test.Skip("set both dedicated com0com test endpoints to run driver integration")
 	}
 	if path == pair {
-		t.Fatal("com0com test endpoints must be different")
+		test.Fatal("com0com test endpoints must be different")
 	}
 	port, err := Open(Options{Path: path, PairDevice: pair})
 	if err != nil {
-		t.Fatalf("open actual com0com backend: %v", err)
+		test.Fatalf("open actual com0com backend: %v", err)
 	}
-	t.Cleanup(func() { port.Close() })
+	test.Cleanup(func() { port.Close() })
 	application, err := serial.Open(path, &serial.Mode{
 		BaudRate: 115200, DataBits: 8,
 		InitialStatusBits: &serial.ModemOutputBits{},
 	})
 	if err != nil {
-		t.Fatalf("open paired application endpoint: %v", err)
+		test.Fatalf("open paired application endpoint: %v", err)
 	}
-	t.Cleanup(func() { application.Close() })
+	test.Cleanup(func() { application.Close() })
 	if err := application.SetReadTimeout(3 * time.Second); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	return port, application
 }
 
-func driverRead(t *testing.T, reader io.Reader, expected []byte) {
-	t.Helper()
+func driverRead(test *testing.T, reader io.Reader, expected []byte) {
+	test.Helper()
 	completed := make(chan error, 1)
 	go func() {
 		actual := make([]byte, len(expected))
@@ -59,15 +59,15 @@ func driverRead(t *testing.T, reader io.Reader, expected []byte) {
 	select {
 	case err := <-completed:
 		if err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 	case <-time.After(5 * time.Second):
-		t.Fatal("com0com binary transfer timed out")
+		test.Fatal("com0com binary transfer timed out")
 	}
 }
 
-func TestCom0comDriverBinarySettingsAndControlLines(t *testing.T) {
-	port, application := openDriverPair(t)
+func TestCom0comDriverBinarySettingsAndControlLines(test *testing.T) {
+	port, application := openDriverPair(test)
 	receivedEvents := make(chan Event, 128)
 	go func() {
 		for event := range port.Events() {
@@ -76,58 +76,58 @@ func TestCom0comDriverBinarySettingsAndControlLines(t *testing.T) {
 		close(receivedEvents)
 	}()
 	if err := application.SetMode(&serial.Mode{BaudRate: 57600, DataBits: 8}); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if err := application.SetDTR(true); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	if err := application.SetRTS(true); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	payload := []byte{0, 0x8e, 0xff, '\r', '\n', 0x03, 0x7f}
 	if _, err := application.Write(payload); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
-	driverRead(t, port, payload)
+	driverRead(test, port, payload)
 	if _, err := port.Write(payload); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
-	driverRead(t, application, payload)
+	driverRead(test, application, payload)
 	settingsSeen, controlSeen := false, false
 	deadline := time.After(5 * time.Second)
 	for !settingsSeen || !controlSeen {
 		select {
 		case event, open := <-receivedEvents:
 			if !open {
-				t.Fatal("com0com events closed before settings arrived")
+				test.Fatal("com0com events closed before settings arrived")
 			}
 			settingsSeen = settingsSeen || event.Kind == EventLineSettings && event.Line.BaudRate == 57600 && event.Line.DataBits == 8
 			controlSeen = controlSeen || event.Kind == EventControlLines && event.Control.DTR && event.Control.RTS
 		case <-deadline:
-			t.Fatalf("com0com reports settings=%v control=%v", settingsSeen, controlSeen)
+			test.Fatalf("com0com reports settings=%v control=%v", settingsSeen, controlSeen)
 		}
 	}
 	if err := port.SetModemStatus(ModemStatus{CTS: true, DSR: true}); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	modemDeadline := time.Now().Add(3 * time.Second)
 	for {
 		status, err := application.GetModemStatusBits()
 		if err != nil {
-			t.Fatal(err)
+			test.Fatal(err)
 		}
 		if status.CTS && status.DSR {
 			break
 		}
 		if time.Now().After(modemDeadline) {
-			t.Fatalf("paired endpoint did not observe CTS/DSR: %+v", status)
+			test.Fatalf("paired endpoint did not observe CTS/DSR: %+v", status)
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
 }
 
-func TestCom0comDriverCloseCancelsReadAndAllowsReopen(t *testing.T) {
-	port, application := openDriverPair(t)
+func TestCom0comDriverCloseCancelsReadAndAllowsReopen(test *testing.T) {
+	port, application := openDriverPair(test)
 	go func() {
 		for range port.Events() {
 		}
@@ -139,25 +139,25 @@ func TestCom0comDriverCloseCancelsReadAndAllowsReopen(t *testing.T) {
 	}()
 	select {
 	case err := <-completed:
-		t.Fatalf("read finished before Close: %v", err)
+		test.Fatalf("read finished before Close: %v", err)
 	case <-time.After(50 * time.Millisecond):
 	}
 	if err := port.Close(); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
 	select {
 	case err := <-completed:
 		if !errors.Is(err, os.ErrClosed) {
-			t.Fatalf("cancelled read returned %v", err)
+			test.Fatalf("cancelled read returned %v", err)
 		}
 	case <-time.After(5 * time.Second):
-		t.Fatal("Close did not cancel overlapped read")
+		test.Fatal("Close did not cancel overlapped read")
 	}
 	if err := application.Close(); err != nil {
-		t.Fatal(err)
+		test.Fatal(err)
 	}
-	reopened, _ := openDriverPair(t)
+	reopened, _ := openDriverPair(test)
 	if reopened.Path() != port.Path() {
-		t.Fatal("reopened pair changed the application endpoint")
+		test.Fatal("reopened pair changed the application endpoint")
 	}
 }

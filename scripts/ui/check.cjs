@@ -154,7 +154,10 @@ async function checkFunctional(page, browserName) {
   await page.waitForSelector("[data-mapping]");
   assert.ok((await page.locator("[data-mappings]").innerText()).includes("/dev/test-virtual-only"));
   await page.locator("[data-nav=share]").click();
-  await page.getByRole("checkbox", { name: "共享 /dev/local-fixture", exact: true }).check();
+  await Promise.all([
+    page.waitForResponse(response => new URL(response.url()).pathname === "/native/v1/share" && response.request().method() === "PUT"),
+    page.getByRole("checkbox", { name: "共享 /dev/local-fixture", exact: true }).check(),
+  ]);
   assert.deepEqual(shared[0], { id: "local-test", shared: true });
   await page.locator("[data-nav=monitor]").click();
   await page.locator("[data-format]").selectOption("hex");
