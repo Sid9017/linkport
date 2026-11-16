@@ -1,0 +1,186 @@
+name: Platform compatibility
+
+on:
+  workflow_call:
+    inputs:
+      platform:
+        type: string
+        required: true
+      targets:
+        type: string
+        required: true
+      frontend-runner:
+        type: string
+        required: true
+      browsers:
+        type: string
+        required: true
+      ref:
+        type: string
+        default: ""
+      tag:
+        type: string
+        default: ""
+    secrets:
+      LINKPORT_UPDATE_PUBLIC_KEY:
+        required: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  GOTOOLCHAIN: local
+  GOFLAGS: -mod=readonly
+
+jobs:
+  backend:
+    name: Backend ${{ matrix.os }}_${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(inputs.targets) }}
+    env:
+      CGO_ENABLED: ${{ matrix.os == 'darwin' && '1' || '0' }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Test backend and protocol integration
+        run: |
+          mkdir -p dist/ci
+          go test -json -count=1 -timeout=5m ./... | tee dist/ci/backend.json
+      - name: Validate and package CLI
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_TARGET: ${{ matrix.os }}_${{ matrix.arch }}
+        run: |
+          python scripts/release.py --validate-only
+          python scripts/release.py --self-test
+          args=()
+          if [[ -n "$RELEASE_TAG" ]]; then args+=(--tag "$RELEASE_TAG"); fi
+          python scripts/release.py --target "$RELEASE_TARGET" "${args[@]}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: backend-report-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/ci/backend.json
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linkport-${{ matrix.os }}-${{ matrix.arch }}
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+          if-no-files-found: error
+          compression-level: 0
+
+  vport:
+    name: ${{ inputs.platform == 'windows' && 'com0com driverless' || 'PTY integration' }} ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(inputs.targets) }}
+    env:
+      CGO_ENABLED: ${{ matrix.os == 'windows' && '0' || '1' }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          persist-credentials: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Test real PTYs and serial bridge with race detector
+        if: inputs.platform != 'windows'
+        run: |
+          mkdir -p dist/ci
+          go test -race -json -count=1 -timeout=5m ./internal/vport ./internal/session ./internal/engine | tee dist/ci/vport.json
+      - name: Test Windows adapter and com0com decoder without driver
+        if: inputs.platform == 'windows'
+        run: |
+          mkdir -p dist/ci
+          go test -json -count=1 -timeout=2m ./internal/vport | tee dist/ci/vport.json
+          go test -c -tags com0com_integration -o dist/ci/com0com.test.exe ./internal/vport
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vport-report-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/ci/vport.json
+          if-no-files-found: warn
+
+  frontend:
+    name: Frontend ${{ inputs.platform }}
+    runs-on: ${{ inputs.frontend-runner }}
+    timeout-minutes: 25
+    env:
+      CGO_ENABLED: ${{ inputs.platform == 'windows' && '0' || '1' }}
+      MACOSX_DEPLOYMENT_TARGET: "14.5"
+      CGO_CFLAGS: ${{ inputs.platform == 'darwin' && '-mmacosx-version-min=14.5' || '' }}
+      CGO_CXXFLAGS: ${{ inputs.platform == 'darwin' && '-mmacosx-version-min=14.5' || '' }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          persist-credentials: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.26.11"
+          cache: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: scripts/ui/package-lock.json
+      - name: Install Linux desktop headers
+        if: inputs.platform == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
+      - name: Install browser test dependencies
+        working-directory: scripts/ui
+        env:
+          TEST_BROWSERS: ${{ inputs.browsers }}
+        run: |
+          npm ci --ignore-scripts
+          read -r -a browsers <<< "$TEST_BROWSERS"
+          npx playwright install --with-deps "${browsers[@]}"
+      - name: Test live frontend against isolated API fixtures
+        working-directory: desktop
+        env:
+          LINKPORT_UI_CHECK: ${{ github.workspace }}/scripts/ui/check.cjs
+          LINKPORT_UI_FIXTURES: "1"
+          LINKPORT_UI_BROWSERS: ${{ inputs.browsers }}
+          LINKPORT_UI_OUTPUT: ${{ github.workspace }}/dist/ci/ui
+        run: go test -tags production -count=1 -v -timeout=5m -run '^TestLiveDesktopBrowser$' .
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: frontend-report-${{ inputs.platform }}
+          path: dist/ci/ui
+          if-no-files-found: warn
+
+  desktop:
+    name: Desktop packages
+    needs: [backend, vport, frontend]
+    uses: ./.github/workflows/desktop.yml
+    with:
+      ref: ${{ inputs.ref || github.ref }}
+      tag: ${{ inputs.tag }}
+      targets: ${{ inputs.targets }}
+    secrets: inherit

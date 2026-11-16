@@ -8,6 +8,9 @@ does not represent a completed serial application or a production desktop app.
 
 - Establishes version metadata, native platform build checks, deterministic
   archive packaging, SHA-256 checksums, and a draft release workflow.
+- Separates Windows, Linux and macOS CI into backend, virtual-port and frontend
+  jobs; adds Chromium/WebKit fixture tests and a dedicated opt-in com0com driver
+  workflow that fails when required driver configuration is missing.
 - Adds opt-in local serial sharing rules, USB identity matching, polling and
   hotplug snapshots, bounded subscriptions, and a read-only development SSE API.
 - Provides PTY and com0com virtual-port backends behind one Go interface.

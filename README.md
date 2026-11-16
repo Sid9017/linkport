@@ -100,4 +100,6 @@ python3 scripts/release.py
 
 GitHub Actions 对 macOS/Linux/Windows 的 amd64、arm64 分别构建 CLI 与 Wails 桌面归档。已有的 `v0.0.1` tag 必须与 `VERSION` 和提交一致，Release workflow 才会汇总归档并创建 **Draft / Pre-release**。工作流不会自动公开发布；发布签名只在配置对应密钥后生成。
 
+每次推送和 PR 分别运行 Windows、Linux、macOS 三个 CI 流程，后端、虚拟串口和前端交互独立测试，通过后生成桌面包。Unix 使用真实 PTY 并运行 race 检查；Windows 的托管 runner 验证适配器与 com0com 解码器，真实驱动使用单独的专用 runner 流程，未配置时明确跳过。前端使用隔离数据在 Chromium/WebKit 中运行，报告、截图和 trace 随 CI 保存。覆盖范围和 com0com 配置见 [docs/ci.md](docs/ci.md)。
+
 完整流程见 [docs/releasing.md](docs/releasing.md)，架构与代码树见 [docs/architecture.md](docs/architecture.md)。

@@ -1,0 +1,32 @@
+name: macOS
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        default: ""
+      tag:
+        type: string
+        default: ""
+    secrets:
+      LINKPORT_UPDATE_PUBLIC_KEY:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  compatibility:
+    uses: ./.github/workflows/platform.yml
+    with:
+      platform: darwin
+      frontend-runner: macos-15
+      browsers: chromium webkit
+      targets: '[{"os":"darwin","arch":"arm64","runner":"macos-15"},{"os":"darwin","arch":"amd64","runner":"macos-15-intel"}]'
+      ref: ${{ inputs.ref || github.ref }}
+      tag: ${{ inputs.tag }}
+    secrets: inherit

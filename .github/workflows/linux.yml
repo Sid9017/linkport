@@ -1,0 +1,32 @@
+name: Linux
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        default: ""
+      tag:
+        type: string
+        default: ""
+    secrets:
+      LINKPORT_UPDATE_PUBLIC_KEY:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  compatibility:
+    uses: ./.github/workflows/platform.yml
+    with:
+      platform: linux
+      frontend-runner: ubuntu-24.04
+      browsers: chromium webkit
+      targets: '[{"os":"linux","arch":"amd64","runner":"ubuntu-24.04"},{"os":"linux","arch":"arm64","runner":"ubuntu-24.04-arm"}]'
+      ref: ${{ inputs.ref || github.ref }}
+      tag: ${{ inputs.tag }}
+    secrets: inherit

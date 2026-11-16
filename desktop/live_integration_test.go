@@ -62,9 +62,16 @@ func TestLiveDesktopBrowser(t *testing.T) {
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	live, err := engine.New(ctx, engine.Options{
+	options := engine.Options{
 		Directory: t.TempDir(), DeviceDirectory: t.TempDir(), DisableNetworkListener: true,
-	})
+	}
+	if os.Getenv("LINKPORT_UI_FIXTURES") == "1" {
+		options.Enumerator = serialport.EnumerateFunc(func(context.Context) ([]serialport.Port, error) {
+			return []serialport.Port{{Path: "/dev/frontend-fixture", Product: "Frontend fixture"}}, nil
+		})
+		options.Tailnet = &tailnet.Client{Binary: func() (string, error) { return "", os.ErrNotExist }}
+	}
+	live, err := engine.New(ctx, options)
 	if err != nil {
 		t.Fatal(err)
 	}

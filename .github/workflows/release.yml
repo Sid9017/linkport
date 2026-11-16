@@ -47,18 +47,11 @@ jobs:
     with:
       ref: ${{ needs.validate.outputs.commit }}
       tag: ${{ needs.validate.outputs.tag }}
-
-  desktop:
-    needs: validate
-    uses: ./.github/workflows/desktop.yml
-    with:
-      ref: ${{ needs.validate.outputs.commit }}
-      tag: ${{ needs.validate.outputs.tag }}
     secrets:
       LINKPORT_UPDATE_PUBLIC_KEY: ${{ secrets.LINKPORT_UPDATE_PUBLIC_KEY }}
 
   draft:
-    needs: [validate, build, desktop]
+    needs: [validate, build]
     runs-on: ubuntu-24.04
     permissions:
       contents: write

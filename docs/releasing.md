@@ -75,9 +75,12 @@ GOCACHE=/tmp/linkport-gocache CGO_ENABLED=1 go build -mod=readonly -trimpath -bu
 
 ## CI and native platforms
 
-`ci.yml` runs tests and packages the same command on all six native platforms.
-The release workflow calls that same CI workflow with the validated commit.
-Only the final draft job gets `contents: write`.
+Every push and pull request runs separate Windows, Linux and macOS workflows.
+Each separates backend, virtual-port and frontend jobs, then builds both native
+desktop architectures after those checks pass. The release workflow calls
+`ci.yml`, which reuses all three platform workflows with the validated commit.
+Only the final draft job gets `contents: write`. Coverage and driver-runner
+configuration are documented in [ci.md](ci.md).
 
 | GOOS | GOARCH | GitHub runner | cgo |
 | --- | --- | --- | --- |
@@ -101,14 +104,17 @@ enabled for detailed serial enumeration through IOKit. Do not replace these
 with Linux cross builds or disable cgo to make a build pass.
 
 Windows virtual ports require a compatible, preinstalled com0com driver and an
-existing port pair. The driver and its installer are not bundled. CI does not
-install drivers or certify real hardware, com0com behavior, or Windows arm64
-driver availability. macOS archives are unsigned and not notarized. Hardware,
-driver integration, and desktop usability need separate validation.
+existing port pair. The driver and its installer are not bundled. Hosted CI
+tests the Windows adapter and decoder without installing a driver. The separate
+`com0com.yml` workflow can test a real pair on a configured dedicated Windows
+x64 runner; it is skipped until enabled and is not a default release gate.
+Windows arm64 driver availability remains unverified. CLI macOS archives are
+unsigned; desktop apps have an ad-hoc signature. Neither is notarized. Hardware
+and native desktop usability need separate validation.
 
 ## Draft release procedure
 
-The release workflow also calls `desktop.yml`, building with Go 1.26.11.
+Each platform workflow calls `desktop.yml`, building with Go 1.26.11.
 Desktop artifacts live under `dist/desktop` and use ZIP on each platform.
 `desktop-checksums.txt` lists only the six desktop ZIP filenames, matching the
 updater provider. With both update signing secrets configured, the release job
