@@ -1,0 +1,1069 @@
+<style>
+@font-face { font-family: "Linkport Sans"; src: url("/assets/fonts/Geist.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "Linkport Mono"; src: url("/assets/fonts/GeistMono.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+#linkport-review {
+  --lp-bg: light-dark(#ffffff, #1b1b1b);
+  --lp-soft: light-dark(#f5f5f5, #252525);
+  --lp-text: light-dark(#222222, #ededed);
+  --lp-muted: light-dark(#666666, #b0b0b0);
+  --lp-line: light-dark(#dedede, #414141);
+  --lp-strong: light-dark(#414141, #d5d5d5);
+  --lp-accent: light-dark(#292929, #e2e2e2);
+  --lp-accent-text: light-dark(#383838, #d4d4d4);
+  --lp-tint: light-dark(#f0f0f0, #303030);
+  --lp-secondary: light-dark(#666666, #b5b5b5);
+  --lp-warn: light-dark(#666666, #bdbdbd);
+  --lp-error: light-dark(#444444, #d0d0d0);
+  color: var(--lp-text);
+  --lp-sans: "Linkport Sans", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --lp-mono: "Linkport Mono", "SFMono-Regular", Consolas, monospace;
+  --lp-font-scale: 1;
+  font: calc(13px * var(--lp-font-scale))/1.5 var(--lp-sans);
+  color-scheme: light dark;
+  min-width: 0;
+  height: 100%;
+}
+#linkport-review * { box-sizing: border-box; }
+#linkport-review [hidden] { display: none !important; }
+#linkport-review button, #linkport-review input, #linkport-review select { font: inherit; color: inherit; }
+#linkport-review button, #linkport-review select { cursor: default; }
+#linkport-review button:focus-visible, #linkport-review input:focus-visible, #linkport-review select:focus-visible { outline: 2px solid var(--lp-accent); outline-offset: 3px; }
+#linkport-review button { background: var(--lp-bg); border: 1px solid var(--lp-line); padding: 6px 11px; border-radius: 6px; white-space: nowrap; transition: background-color 140ms, border-color 140ms; }
+#linkport-review button:hover { background: var(--lp-soft); border-color: var(--lp-strong); }
+#linkport-review button:active:not(:disabled) { background: var(--lp-tint); }
+#linkport-review button:disabled { opacity: .5; }
+#linkport-review .lp-primary { background: var(--lp-text); color: var(--lp-bg); border-color: var(--lp-text); }
+#linkport-review .lp-primary:hover { background: var(--lp-strong); }
+#linkport-review .lp-plain { border-color: transparent; background: transparent; }
+#linkport-review .lp-window { height: 100%; display: flex; flex-direction: column; background: var(--lp-bg); overflow: hidden; }
+#linkport-review .lp-titlebar { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 52px; flex: none; padding: 8px 20px; border-bottom: 1px solid var(--lp-line); }
+#linkport-review .lp-brand { display: flex; gap: 9px; align-items: center; font-size: calc(15px * var(--lp-font-scale)); font-weight: 600; letter-spacing: -.35px; }
+#linkport-review .lp-brand svg { width: 20px; height: 20px; }
+#linkport-review .lp-version { color: var(--lp-muted); font: 11px/1.5 var(--lp-mono); font-weight: 400; letter-spacing: 0; margin-left: 1px; }
+#linkport-review .lp-caption { color: var(--lp-muted); font-size: calc(12px * var(--lp-font-scale)); }
+#linkport-review .lp-titletools, #linkport-review .lp-inline { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+#linkport-review .lp-titletools { gap: 12px; flex-wrap: nowrap; }
+#linkport-review .lp-preview-label { font-size: 11px; border: 1px solid var(--lp-line); border-radius: 4px; padding: 1px 6px; }
+#linkport-review select { max-width: 100%; background: var(--lp-bg); border: 1px solid var(--lp-line); border-radius: 6px; padding: 4px 6px; }
+#linkport-review .lp-netstate { color: var(--lp-secondary); font-size: calc(12px * var(--lp-font-scale)); display: flex; gap: 6px; align-items: center; }
+#linkport-review .lp-layout { display: grid; grid-template-columns: 148px minmax(0, 1fr); position: relative; min-height: 0; flex: 1; overflow: hidden; }
+#linkport-review .lp-sidebar { padding: 16px 10px; border-right: 1px solid var(--lp-line); background: var(--lp-soft); }
+#linkport-review .lp-sidebar button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 36px; padding: 8px 12px; margin-bottom: 6px; border: 0; text-align: left; color: var(--lp-muted); background: transparent; font-weight: 500; }
+#linkport-review .lp-sidebar button[aria-current="page"] { background: var(--lp-bg); color: var(--lp-text); }
+#linkport-review .lp-sidebar button[aria-current="page"] svg { color: var(--lp-accent-text); }
+#linkport-review .lp-panels { min-width: 0; min-height: 0; overflow: hidden; }
+#linkport-review .lp-connections { position: absolute; inset: 0; pointer-events: none; z-index: 2; width: 100%; height: 100%; overflow: visible; }
+#linkport-review .lp-connections path { fill: none; stroke: var(--lp-line); stroke-width: 1.4; }
+#linkport-review .lp-connections path[data-link="active"] { stroke: var(--lp-accent); stroke-dasharray: 3 5; stroke-linecap: round; animation: lp-traffic 1.3s linear infinite; }
+#linkport-review .lp-traffic-dot { fill: var(--lp-secondary); }
+#linkport-review .lp-traffic-dot[data-direction="RX"] { fill: var(--lp-accent-text); }
+@keyframes lp-traffic { to { stroke-dashoffset: -32; } }
+@media (prefers-reduced-motion: reduce) {
+  #linkport-review .lp-connections path[data-link="active"] { animation: none; }
+  #linkport-review .lp-traffic-dot { display: none; }
+}
+#linkport-review .lp-symbols { position: absolute; width: 0; height: 0; overflow: hidden; }
+#linkport-review .lp-icon { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+#linkport-review .lp-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; flex: none; background: currentColor; }
+#linkport-review .lp-workspace { padding: 22px 28px; min-width: 0; height: 100%; overflow: auto; scrollbar-width: thin; scrollbar-color: var(--lp-line) transparent; }
+#linkport-review .lp-workspace:not(.lp-monitor) > * { max-width: 960px; }
+#linkport-review .lp-sectionhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 32px; flex: none; margin-bottom: 18px; }
+#linkport-review h2, #linkport-review h3, #linkport-review p { margin: 0; }
+#linkport-review h2 { font-size: calc(15px * var(--lp-font-scale)); font-weight: 600; letter-spacing: -.2px; }
+#linkport-review .lp-topology { display: grid; grid-template-columns: 152px minmax(0,1fr); gap: 64px; align-items: center; margin: 4px 0 28px; padding: 6px 0; position: relative; }
+#linkport-review .lp-local { border: 1px dashed var(--lp-strong); border-radius: 8px; padding: 22px 12px; text-align: center; position: relative; z-index: 3; background: var(--lp-bg); }
+#linkport-review .lp-localicon { color: var(--lp-accent); margin: 0 auto 9px; width: 27px; height: 27px; display: block; }
+#linkport-review .lp-local strong { display: block; font-weight: 600; }
+#linkport-review .lp-local .lp-caption { display: block; margin-top: 4px; }
+#linkport-review .lp-devices { position: relative; display: grid; gap: 14px; padding-left: 12px; min-width: 0; }
+#linkport-review .lp-device { position: relative; min-width: 0; }
+#linkport-review .lp-machine { display: flex; width: 100%; min-height: 38px; align-items: center; gap: 8px; padding: 7px 10px; border: 1px solid transparent; border-radius: 6px; text-align: left; min-width: 0; position: relative; z-index: 3; background: var(--lp-soft); }
+#linkport-review .lp-machine.lp-offline { background: var(--lp-bg); }
+#linkport-review .lp-machine svg { height: 15px; width: 15px; flex: none; color: var(--lp-muted); }
+#linkport-review .lp-machine-name { font-weight: 600; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+#linkport-review code { font: calc(11.5px * var(--lp-font-scale)) var(--lp-mono); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+#linkport-review .lp-machine-meta { color: var(--lp-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#linkport-review .lp-right { margin-left: auto; color: var(--lp-muted); font-size: calc(12px * var(--lp-font-scale)); text-align: right; }
+#linkport-review .lp-badge { font-size: calc(11px * var(--lp-font-scale)); border: 1px solid var(--lp-line); border-radius: 5px; padding: 1px 5px; color: var(--lp-muted); white-space: nowrap; }
+#linkport-review .lp-porttree { padding: 8px 0 0 22px; position: relative; display: grid; gap: 8px; }
+#linkport-review .lp-portrow { position: relative; display: flex; gap: 10px; align-items: center; border: 1px dashed var(--lp-line); border-radius: 6px; min-height: 62px; padding: 9px 12px; min-width: 0; background: var(--lp-bg); z-index: 3; }
+#linkport-review .lp-portrow[data-active="true"] { border-color: var(--lp-accent); background: var(--lp-tint); }
+#linkport-review .lp-porticon { width: 15px; height: 15px; color: var(--lp-accent); flex: none; }
+#linkport-review .lp-portdesc { min-width: 0; flex: 1; }
+#linkport-review .lp-portdesc strong { font-weight: 500; overflow-wrap: anywhere; }
+#linkport-review .lp-portdesc .lp-caption { display: block; margin-top: 3px; line-height: 1.5; }
+#linkport-review .lp-portaction { font-size: 12px; padding: 4px 9px; }
+#linkport-review .lp-portaction.lp-iconbutton { width: 30px; height: 30px; border: 1px solid var(--lp-line); }
+#linkport-review .lp-connected { color: var(--lp-secondary); font-size: calc(12px * var(--lp-font-scale)); white-space: nowrap; }
+#linkport-review .lp-offline { color: var(--lp-muted); }
+#linkport-review .lp-mapping { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; min-height: 62px; padding: 10px 0; border-bottom: 1px solid var(--lp-line); }
+#linkport-review .lp-mapping code { flex: 1; min-width: 150px; }
+#linkport-review .lp-mapping svg { height: 15px; width: 15px; color: var(--lp-muted); }
+#linkport-review .lp-mapping .lp-caption { color: var(--lp-warn); }
+#linkport-review .lp-mapping-source { min-width: 210px; max-width: 100%; overflow-wrap: anywhere; font-size: calc(12px * var(--lp-font-scale)); }
+#linkport-review .lp-mapping-source span { display: block; color: var(--lp-muted); font-size: calc(11px * var(--lp-font-scale)); }
+#linkport-review .lp-mapping-heading { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 0; padding-bottom: 12px; border-bottom: 1px solid var(--lp-line); }
+#linkport-review .lp-mapping-heading h2 { font-size: calc(13px * var(--lp-font-scale)); font-weight: 500; }
+#linkport-review .lp-session-select { max-width: 350px; }
+#linkport-review .lp-monitor-selector { display: flex; align-items: center; gap: 8px; min-width: 0; }
+#linkport-review .lp-monitor-selector select { min-width: 0; }
+#linkport-review .lp-loglines.lp-log-empty { display: grid; place-items: center; }
+#linkport-review .lp-monitor-empty { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 24px; }
+#linkport-review .lp-local-port-picker { display: grid; gap: 8px; margin: 12px 0; }
+#linkport-review .lp-local-port-picker select { width: 100%; min-height: 34px; }
+#linkport-review .lp-terminal { border: 1px solid var(--lp-line); border-radius: 6px; overflow: hidden; min-height: 0; display: flex; flex-direction: column; flex: 1; }
+#linkport-review .lp-termhead { padding: 8px 11px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; border-bottom: 1px solid var(--lp-line); }
+#linkport-review .lp-termhead strong { font-weight: 600; }
+#linkport-review .lp-termhead .lp-inline { margin-left: auto; gap: 5px; }
+#linkport-review input[type="checkbox"] { accent-color: var(--lp-accent); width: 14px; height: 14px; margin: 0; }
+#linkport-review .lp-filter { min-width: 90px; width: 150px; padding: 6px 9px; border: 1px solid var(--lp-line); border-radius: 6px; background: var(--lp-bg); outline-offset: 1px; }
+#linkport-review .lp-loglines { padding: 12px 14px; min-height: 72px; flex: 1; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--lp-line) transparent; }
+#linkport-review .lp-logline { display: grid; grid-template-columns: 12ch 3ch minmax(0, 1fr); gap: 12px; font: calc(12px * var(--lp-font-scale))/1.9 var(--lp-mono); font-variant-numeric: tabular-nums; }
+#linkport-review .lp-logline time { color: var(--lp-muted); }
+#linkport-review .lp-logline .lp-direction { color: var(--lp-accent-text); }
+#linkport-review .lp-logline[data-kind="SYS"] .lp-message { color: var(--lp-muted); }
+#linkport-review .lp-logline[data-kind="TX"] .lp-direction { color: var(--lp-secondary); }
+#linkport-review .lp-message { overflow-wrap: anywhere; white-space: pre-wrap; }
+#linkport-review .lp-empty { padding: 35px 0; text-align: center; color: var(--lp-muted); font-size: 12px; }
+#linkport-review .lp-commandbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 13px; border-top: 1px solid var(--lp-line); }
+#linkport-review .lp-logcontrols { display: flex; align-items: center; gap: 8px; min-width: 0; padding-right: 8px; border-right: 1px solid var(--lp-line); }
+#linkport-review .lp-logcontrols .lp-filter { flex: 0 1 150px; min-width: 90px; }
+#linkport-review .lp-commandbar select, #linkport-review .lp-commandbar input { min-height: 31px; }
+#linkport-review .lp-send { display: flex; align-items: center; gap: 8px; flex: 1 1 260px; flex-wrap: wrap; min-width: 0; }
+#linkport-review .lp-send input { flex: 1; width: 100px; min-width: 100px; border: 1px solid var(--lp-line); border-radius: 6px; background: var(--lp-bg); padding: 6px 9px; font-family: var(--lp-mono); caret-color: var(--lp-accent); }
+#linkport-review input::placeholder { color: var(--lp-muted); opacity: 1; }
+#linkport-review .lp-sharelist { border-top: 1px solid var(--lp-line); }
+#linkport-review .lp-shareitem { display: flex; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--lp-line); }
+#linkport-review .lp-shareitem > svg { width: 18px; height: 18px; color: var(--lp-muted); flex: none; }
+#linkport-review .lp-sharelabel { margin-left: auto; display: flex; gap: 8px; align-items: center; white-space: nowrap; }
+#linkport-review .lp-sharestatus { color: var(--lp-muted); font-size: 12px; }
+#linkport-review .lp-sharing { color: var(--lp-secondary); }
+#linkport-review .lp-sharepanel .lp-portdesc strong { font-weight: 500; }
+#linkport-review .lp-monitor { display: flex; flex-direction: column; overflow: hidden; }
+#linkport-review .lp-termhead, #linkport-review .lp-commandbar { flex: none; }
+#linkport-review .lp-pluginempty { padding: 110px 20px; text-align: center; color: var(--lp-muted); }
+#linkport-review .lp-pluginempty svg { width: 34px; height: 34px; color: var(--lp-accent); margin-bottom: 15px; }
+#linkport-review .lp-pluginempty strong { display: block; color: var(--lp-text); font-size: 14px; font-weight: 500; margin-bottom: 7px; }
+#linkport-review #lp-remote { display: flex; flex-direction: column; }
+#linkport-review #lp-remote > * { flex-shrink: 0; }
+#linkport-review #lp-remote .lp-connection-empty { display: flex; flex: 1 0 auto; flex-direction: column; align-items: center; justify-content: center; min-height: 200px; max-width: none; padding: 24px 20px; text-align: center; color: var(--lp-muted); }
+#linkport-review .lp-connection-empty strong { color: var(--lp-text); font-size: calc(16px * var(--lp-font-scale)); line-height: 1.4; font-weight: 600; }
+#linkport-review .lp-connection-empty p { max-width: 38ch; margin: 8px 0 0; line-height: 1.6; text-wrap: pretty; }
+#linkport-review .lp-connection-empty button { margin-top: 20px; min-height: 34px; max-width: 100%; padding: 6px 14px; }
+#linkport-review.lp-live #lp-remote .lp-topology[data-scrollable="true"] { flex: 1 1 0; min-height: 168px; max-height: 520px; grid-template-rows: minmax(0, 1fr); }
+#linkport-review.lp-live .lp-topology[data-scrollable="true"] .lp-devices { height: 100%; min-height: 0; align-content: start; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--lp-line) transparent; padding-right: 6px; }
+#linkport-review.lp-live .lp-topology[data-scrollable="true"] .lp-local { align-self: center; }
+#linkport-review.lp-live .lp-topology[data-scrollable="true"] .lp-machine { position: sticky; top: 0; z-index: 4; }
+#linkport-review.lp-live .lp-topology[data-scrollable="true"] .lp-connections { overflow: hidden; }
+#linkport-review .lp-notice, #linkport-review .lp-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+#linkport-review .lp-iconbutton { display: inline-flex; align-items: center; justify-content: center; width: 29px; height: 29px; padding: 5px; border: 0; background: transparent; border-radius: 6px; position: relative; }
+#linkport-review .lp-iconbutton:hover { border: 0; background: var(--lp-soft); }
+#linkport-review .lp-iconbutton.lp-primary { background: var(--lp-text); color: var(--lp-bg); }
+#linkport-review .lp-iconbutton.lp-primary:hover { background: var(--lp-strong); }
+#linkport-review .lp-iconbutton::after { content: attr(aria-label); position: absolute; top: calc(100% + 6px); right: 0; padding: 3px 7px; border-radius: 4px; background: var(--lp-text); color: var(--lp-bg); font-size: 11px; opacity: 0; pointer-events: none; white-space: nowrap; z-index: 20; }
+#linkport-review .lp-iconbutton:hover::after, #linkport-review .lp-iconbutton:focus-visible::after { opacity: 1; }
+#linkport-review .lp-send .lp-iconbutton::after { top: auto; bottom: calc(100% + 6px); }
+#linkport-review .lp-capability { position: relative; color: var(--lp-muted); font: 11px var(--lp-mono); }
+#linkport-review .lp-capability::after { content: attr(aria-label); position: absolute; right: 0; bottom: calc(100% + 6px); background: var(--lp-text); color: var(--lp-bg); padding: 4px 7px; border-radius: 4px; font: 11px var(--lp-sans); white-space: nowrap; opacity: 0; pointer-events: none; z-index: 20; }
+#linkport-review .lp-capability:hover::after { opacity: 1; }
+#linkport-review .lp-iconbutton[data-refreshing="true"] svg { animation: lp-refresh .65s linear infinite; }
+@keyframes lp-refresh { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  #linkport-review .lp-iconbutton[data-refreshing="true"] svg { animation: none; }
+}
+#linkport-review ::selection { background: var(--lp-tint); color: var(--lp-text); }
+#linkport-review .lp-settings { width: 480px; max-width: calc(100% - 32px); max-height: calc(100% - 32px); padding: 0; border: 1px solid var(--lp-line); border-radius: 10px; background: var(--lp-bg); color: var(--lp-text); font: inherit; overflow: hidden; }
+#linkport-review .lp-settings[open] { display: flex; flex-direction: column; animation: lp-dialog-in 160ms ease-out; }
+#linkport-review .lp-settings::backdrop { background: rgb(0 0 0 / .16); }
+#linkport-review .lp-settings-head { display: flex; align-items: center; justify-content: space-between; min-height: 54px; padding: 10px 20px; border-bottom: 1px solid var(--lp-line); flex: none; }
+#linkport-review .lp-settings-head h2 { font-size: calc(15px * var(--lp-font-scale)); }
+#linkport-review .lp-settings-body { padding: 0 20px; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
+#linkport-review .lp-setting { display: flex; align-items: center; justify-content: space-between; gap: 20px; min-height: 42px; padding: 6px 0; }
+#linkport-review .lp-setting > span { min-width: 0; }
+#linkport-review .lp-setting select { width: 140px; flex: none; min-height: 30px; font-size: inherit; padding: 3px 8px; }
+#linkport-review .lp-settings-section { padding: 12px 0; }
+#linkport-review .lp-settings-section + .lp-settings-section { border-top: 1px solid var(--lp-line); }
+#linkport-review .lp-setting-info { display: grid; gap: 3px; }
+#linkport-review .lp-settings-status { color: var(--lp-muted); font-size: calc(12px * var(--lp-font-scale)); line-height: 1.5; }
+#linkport-review [data-preference-status] { padding: 0; }
+#linkport-review [data-preference-status]:empty { display: none; }
+#linkport-review .lp-setting button:not(.lp-iconbutton) { padding: 4px 10px; min-height: 30px; }
+#linkport-review .lp-live-toast { position: fixed; right: 20px; bottom: 20px; max-width: min(480px, calc(100% - 40px)); padding: 9px 13px; border: 1px solid var(--lp-line); border-radius: 6px; background: var(--lp-text); color: var(--lp-bg); z-index: 30; font-size: calc(12px * var(--lp-font-scale)); overflow-wrap: anywhere; }
+#linkport-review .lp-connect-form { padding: 12px 20px 20px; overflow: auto; }
+#linkport-review .lp-connect-form input { width: 150px; min-height: 30px; border: 1px solid var(--lp-line); border-radius: 6px; background: var(--lp-bg); padding: 4px 8px; }
+#linkport-review .lp-connect-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+#linkport-review [data-service-status] { margin-bottom: 12px; overflow-wrap: anywhere; }
+#linkport-review .lp-switch { appearance: none; flex: none; width: 28px !important; height: 17px !important; border-radius: 10px; background: var(--lp-line); position: relative; cursor: pointer; transition: background-color 140ms; }
+#linkport-review .lp-switch::after { content: ""; position: absolute; width: 13px; height: 13px; left: 2px; top: 2px; border-radius: 50%; background: var(--lp-bg); transition: transform 140ms; }
+#linkport-review .lp-switch:checked { background: var(--lp-text); }
+#linkport-review .lp-switch:checked::after { transform: translateX(11px); }
+@keyframes lp-dialog-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 900px) {
+  #linkport-review .lp-layout { grid-template-columns: calc(112px * var(--lp-font-scale)) minmax(0,1fr); }
+  #linkport-review .lp-topology { grid-template-columns: 124px minmax(0,1fr); gap: 32px; }
+  #linkport-review .lp-workspace { padding: 18px; }
+  #linkport-review .lp-titlebar { padding-left: 12px; padding-right: 12px; }
+  #linkport-review .lp-titletools { margin-right: 0; }
+  #linkport-review .lp-machine { gap: 6px; }
+  #linkport-review .lp-machine-meta { display: none; }
+  #linkport-review .lp-machine .lp-right { font-size: 11px; }
+  #linkport-review .lp-portrow { gap: 7px; padding: 8px; }
+  #linkport-review .lp-portdesc > code { display: block; }
+  #linkport-review .lp-connected { font-size: 11px; }
+  #linkport-review .lp-logline { gap: 8px; }
+}
+@media (max-width: 600px) {
+  #linkport-review .lp-layout { grid-template-columns: 64px minmax(0,1fr); }
+  #linkport-review .lp-sidebar { padding: 12px 4px; }
+  #linkport-review .lp-sidebar button { flex-direction: column; gap: 3px; padding: 9px 2px; font-size: 11px; }
+  #linkport-review .lp-topology { grid-template-columns: minmax(0,1fr); gap: 16px; }
+  #linkport-review .lp-local { padding: 12px; }
+  #linkport-review .lp-localicon { width: 22px; height: 22px; }
+  #linkport-review .lp-titletools .lp-caption { display: none; }
+  #linkport-review .lp-devices { padding-left: 12px; }
+  #linkport-review .lp-netstate { font-size: 11px; }
+  #linkport-review .lp-titletools { gap: 9px; }
+  #linkport-review .lp-version { display: none; }
+  #linkport-review .lp-workspace { padding: 14px 12px; }
+  #linkport-review .lp-local { display: grid; grid-template-columns: 22px minmax(0,1fr); align-items: center; gap: 4px 10px; text-align: left; }
+  #linkport-review .lp-localicon { grid-row: span 3; margin: 0; }
+  #linkport-review .lp-local .lp-caption { margin: 0; }
+  #linkport-review .lp-machine { flex-wrap: wrap; }
+  #linkport-review .lp-machine .lp-right { flex-basis: 100%; text-align: left; padding-left: 13px; }
+  #linkport-review .lp-connected { display: none; }
+  #linkport-review .lp-sectionhead .lp-inline { gap: 2px 10px; }
+  #linkport-review .lp-logcontrols { width: 100%; border-right: 0; padding-right: 0; }
+  #linkport-review .lp-logcontrols .lp-filter { flex: 1; width: 0; }
+  #linkport-review .lp-send { flex-basis: 100%; gap: 6px; }
+  #linkport-review .lp-send input { min-width: 0; width: 0; }
+  #linkport-review .lp-termhead { gap: 4px; }
+  #linkport-review .lp-session-select { max-width: 100%; }
+  #linkport-review .lp-settings-head { padding: 10px 16px; }
+  #linkport-review .lp-settings-body { padding: 0 16px; }
+  #linkport-review .lp-setting { gap: 12px; }
+  #linkport-review .lp-setting select { width: 124px; }
+  #linkport-review .lp-mapping { align-items: flex-start; }
+  #linkport-review .lp-mapping code { flex-basis: calc(100% - 30px); }
+  #linkport-review .lp-shareitem { flex-wrap: wrap; }
+  #linkport-review .lp-sharelabel { margin-left: auto; }
+  #linkport-review .lp-caption { font-size: 11px; }
+  #linkport-review .lp-termhead .lp-inline { margin-left: 0; }
+}
+@media (pointer: coarse) {
+  #linkport-review button, #linkport-review select, #linkport-review .lp-checkbox, #linkport-review .lp-sharelabel { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #linkport-review button, #linkport-review .lp-switch, #linkport-review .lp-switch::after { transition: none; }
+  #linkport-review .lp-settings[open] { animation: none; }
+}
+</style>
+<div id="linkport-review">
+  <svg class="lp-symbols" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs>
+    <symbol id="lp-icon-logo" viewBox="0 0 24 24"><rect width="24" height="24" rx="5" fill="#111111" stroke="none"/><g transform="translate(2 2) scale(.833333)" stroke="none"><path d="M11 6h4a3 3 0 0 1 0 6H9a3 3 0 0 0 0 6h4" fill="none" stroke="#fff" stroke-width="1.8"/><rect x="3" y="3" width="8" height="6" rx="1.5" fill="#fff"/><rect x="13" y="15" width="8" height="6" rx="1.5" fill="#fff"/><path d="M6 5v2m2-2v2m8 10v2m2-2v2" stroke="#111" stroke-width="1.2"/></g></symbol>
+    <symbol id="lp-icon-local" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="12" rx="2"/><path d="M2 20h20M9 16v4m6-4v4"/></symbol>
+    <symbol id="lp-icon-machine" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M9 21h6m-3-4v4"/><path d="M6 8h3m-3 3h5" opacity=".65"/></symbol>
+    <symbol id="lp-icon-port" viewBox="0 0 24 24"><path d="M5 3h14v9l-4 5H9l-4-5zM9 17v4m6-4v4"/><path d="M9 7v3m3-3v3m3-3v3"/></symbol>
+    <symbol id="lp-icon-radio" viewBox="0 0 24 24"><path d="m10 3 6 5-6 5 6 5-6 3V3zm-4 5 10 10M6 16 16 8"/></symbol>
+    <symbol id="lp-icon-link" viewBox="0 0 24 24"><path d="m9 8 2-2a5 5 0 0 1 7 7l-2 2m-1 1-2 2a5 5 0 0 1-7-7l2-2m1 6 6-6"/></symbol>
+    <symbol id="lp-icon-share" viewBox="0 0 24 24"><circle cx="6" cy="12" r="3"/><circle cx="18" cy="5" r="3"/><circle cx="18" cy="19" r="3"/><path d="m9 10.5 6-4m-6 7 6 4"/></symbol>
+    <symbol id="lp-icon-listen" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m6 12 3 3 4-7 3 5h2"/></symbol>
+    <symbol id="lp-icon-plugin" viewBox="0 0 24 24"><path d="M4 4h6a3 3 0 1 1 5 0h5v6a3 3 0 1 0 0 5v5h-6a3 3 0 1 0-5 0H4v-6a3 3 0 1 0 0-5z"/></symbol>
+    <symbol id="lp-icon-refresh" viewBox="0 0 24 24"><path d="M19 8a8 8 0 1 0 1 7M19 3v5h-5"/></symbol>
+    <symbol id="lp-icon-pause" viewBox="0 0 24 24"><path d="M8 5v14m8-14v14"/></symbol>
+    <symbol id="lp-icon-play" viewBox="0 0 24 24"><path d="m8 4 12 8-12 8z"/></symbol>
+    <symbol id="lp-icon-clear" viewBox="0 0 24 24"><path d="M4 6h16M9 3h6M6 6l1 15h10l1-15M10 10v7m4-7v7"/></symbol>
+    <symbol id="lp-icon-export" viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5"/></symbol>
+    <symbol id="lp-icon-send" viewBox="0 0 24 24"><path d="m3 3 18 9-18 9 4-9zm4 9h14"/></symbol>
+    <symbol id="lp-icon-disconnect" viewBox="0 0 24 24"><path d="m9 8 2-2a5 5 0 0 1 7 7l-2 2m-1 1-2 2a5 5 0 0 1-7-7l2-2M3 3l18 18"/></symbol>
+    <symbol id="lp-icon-settings" viewBox="0 0 24 24"><path d="m10 3-.6 3-2.2 1.3-2.8-1L2.4 10l2.2 2v2l-2.2 2 2 3.7 2.8-1L9.4 20l.6 3h4l.6-3 2.2-1.3 2.8 1 2-3.7-2.2-2v-2l2.2-2-2-3.7-2.8 1L14.6 6 14 3z" transform="translate(0 -1) scale(1 .94)"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="lp-icon-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+    <symbol id="lp-icon-arrow" viewBox="0 0 24 24"><path d="M4 12h16m-5-5 5 5-5 5"/></symbol>
+  </defs></svg>
+  <div class="lp-window" aria-label="Linkport 桌面设计预览，所有数据均为演示">
+    <header class="lp-titlebar">
+      <div class="lp-brand"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-logo"/></svg>Linkport <span class="lp-version">0.0.1</span></div>
+      <div class="lp-titletools"><span class="lp-caption lp-preview-label">演示数据</span><button type="button" class="lp-plain lp-netstate" data-tailscale-login aria-label="登录 Tailscale"><span class="lp-dot"></span><span data-network-state>Tailscale</span></button><button type="button" class="lp-iconbutton" data-settings-open aria-label="设置"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-settings"/></svg></button></div>
+    </header>
+    <main class="lp-layout">
+      <nav class="lp-sidebar" aria-label="主导航">
+        <button type="button" data-nav="connect" aria-current="page"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-link"/></svg><span>连接</span></button>
+        <button type="button" data-nav="share"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-share"/></svg><span>共享</span></button>
+        <button type="button" data-nav="monitor"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-listen"/></svg><span>监听</span></button>
+        <button type="button" data-nav="plugins"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-plugin"/></svg><span>插件</span></button>
+      </nav>
+      <div class="lp-panels">
+      <section id="lp-local-share" class="lp-workspace lp-sharepanel" aria-label="本机串口共享" data-screen="share" hidden>
+        <div class="lp-sectionhead"><h2>共享</h2><div class="lp-inline"><span class="lp-caption" data-share-count>0</span><button type="button" class="lp-iconbutton" data-refresh="share" aria-label="刷新本机串口"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-refresh"/></svg></button></div></div>
+        <p class="lp-caption" data-service-status hidden></p>
+        <div class="lp-sharelist"><template data-demo-shares>
+          <div class="lp-shareitem"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-port"/></svg><div class="lp-portdesc"><strong>USB 串口转换器</strong><span class="lp-caption"><code data-local-port="usb">/dev/cu.usbserial-110</code><br>CP2102 · 10C4:EA60</span></div><label class="lp-sharelabel"><input type="checkbox" data-share="usb" aria-label="共享 USB 串口转换器"><span class="lp-sharestatus lp-sr-only">未共享</span></label></div>
+          <div class="lp-shareitem"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-radio"/></svg><div class="lp-portdesc"><strong>蓝牙传入端口</strong><span class="lp-caption"><code data-local-port="bt">/dev/cu.Bluetooth-Incoming-Port</code></span></div><label class="lp-sharelabel"><input type="checkbox" data-share="bt" aria-label="共享蓝牙传入端口"><span class="lp-sharestatus lp-sr-only">未共享</span></label></div>
+          <div class="lp-shareitem" data-new-device hidden><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-port"/></svg><div class="lp-portdesc"><strong>新插入的调试板</strong><span class="lp-caption"><code data-local-port="new">/dev/cu.usbmodem-210</code><br>ST-Link</span></div><label class="lp-sharelabel"><input type="checkbox" data-share="new" aria-label="共享新插入的调试板"><span class="lp-sharestatus lp-sr-only">未共享</span></label></div>
+        </template></div>
+      </section>
+      <section id="lp-remote" class="lp-workspace" aria-label="远程设备连接" data-screen="connect">
+        <div class="lp-sectionhead">
+          <div class="lp-inline"><h2>设备与串口</h2><span class="lp-caption" data-discovery-summary></span></div>
+          <button type="button" class="lp-iconbutton" data-refresh="connect" aria-label="刷新设备"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-refresh"/></svg></button>
+        </div>
+        <div class="lp-topology">
+          <svg class="lp-connections" aria-hidden="true"></svg>
+          <div class="lp-local">
+            <svg class="lp-icon lp-localicon" aria-hidden="true"><use href="#lp-icon-local"/></svg>
+            <strong>本机</strong><span class="lp-caption" data-host-name>本机</span><code class="lp-caption" data-host-ip>—</code>
+          </div>
+          <div class="lp-devices"><template data-demo-devices>
+            <article class="lp-device">
+              <button type="button" class="lp-machine" aria-expanded="true" aria-controls="lp-lab-ports" data-expand="lp-lab-ports">
+                <span class="lp-dot" style="color:var(--lp-accent)"></span><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-machine"/></svg>
+                <span class="lp-machine-name">lab-linux</span>
+                <code class="lp-machine-meta">100.101.20.4</code><span class="lp-right" data-lab-state>2 个共享串口</span>
+              </button>
+              <div class="lp-porttree" id="lp-lab-ports">
+                <div class="lp-portrow" data-port="esp32" data-active="true">
+                  <svg class="lp-icon lp-porticon" aria-hidden="true"><use href="#lp-icon-port"/></svg>
+                  <div class="lp-portdesc"><strong>ESP32 调试板</strong> <code>/dev/ttyUSB0</code><span class="lp-caption">CP2102 · 115200 · 8N1</span></div>
+                  <span class="lp-connected" data-state="esp32">已连接</span><button type="button" class="lp-portaction lp-iconbutton" data-connect="esp32" aria-label="断开 ESP32 调试板"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-disconnect"/></svg></button>
+                </div>
+                <div class="lp-portrow" data-port="stm32" data-active="false">
+                  <svg class="lp-icon lp-porticon" aria-hidden="true"><use href="#lp-icon-port"/></svg>
+                  <div class="lp-portdesc"><strong>STM32 控制板</strong> <code>/dev/ttyACM0</code><span class="lp-caption">ST-Link · 空闲</span></div>
+                  <span class="lp-connected" data-state="stm32" hidden>已连接</span><button type="button" class="lp-portaction lp-iconbutton" data-connect="stm32" aria-label="连接 STM32 控制板"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-link"/></svg></button>
+                </div>
+              </div>
+            </article>
+            <article class="lp-device">
+              <button type="button" class="lp-machine" aria-expanded="false" aria-controls="lp-win-ports" data-expand="lp-win-ports">
+                <span class="lp-dot" style="color:var(--lp-accent)"></span><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-machine"/></svg>
+                <span class="lp-machine-name">bench-windows</span><code class="lp-machine-meta">100.101.30.6</code><span class="lp-right">1 个共享串口</span>
+              </button>
+              <div class="lp-porttree" id="lp-win-ports" hidden>
+                <div class="lp-portrow" data-port="uart" data-active="false">
+                  <svg class="lp-icon lp-porticon" aria-hidden="true"><use href="#lp-icon-port"/></svg>
+                  <div class="lp-portdesc"><strong>USB UART</strong> <code>COM3</code><span class="lp-caption">CH340 · 空闲</span></div>
+                  <span class="lp-connected" data-state="uart" hidden>已连接</span><button type="button" class="lp-portaction lp-iconbutton" data-connect="uart" aria-label="连接 USB UART"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-link"/></svg></button>
+                </div>
+              </div>
+            </article>
+            <article class="lp-device">
+              <div class="lp-machine lp-offline"><span class="lp-dot"></span><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-machine"/></svg><span class="lp-machine-name">workshop-mac</span><span class="lp-right">离线 · 12 分钟前</span></div>
+            </article>
+          </template></div>
+        </div>
+        <div class="lp-mapping-heading"><h2>本地映射</h2><span class="lp-caption" data-connection-count>1 条连接</span></div>
+        <div data-mappings aria-live="polite"></div>
+        <div class="lp-connection-empty" data-connection-empty hidden><strong data-empty-title></strong><p data-empty-copy></p><button type="button" class="lp-primary" data-live-login hidden>登录 Tailscale</button></div>
+      </section>
+      <section class="lp-workspace lp-monitor" aria-label="串口监听" data-screen="monitor" hidden>
+        <div class="lp-sectionhead"><h2>监听</h2><div class="lp-monitor-selector"><select class="lp-session-select" data-session-select aria-label="监听会话"><option value="">暂无会话</option></select><button type="button" class="lp-iconbutton" data-local-monitor-open aria-label="监听本机串口" title="监听本机串口" hidden><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-port"/></svg></button></div></div>
+        <section class="lp-terminal" aria-label="串口日志监听">
+          <div class="lp-termhead">
+            <span class="lp-caption" data-session-label>暂无会话</span>
+            <span class="lp-badge" data-session-status>未连接</span>
+            <div class="lp-inline"><button type="button" class="lp-iconbutton" data-action="disconnect" aria-label="关闭串口" hidden><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-disconnect"/></svg></button><button type="button" class="lp-iconbutton" data-action="pause" aria-label="暂停显示"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-pause"/></svg></button><button type="button" class="lp-iconbutton" data-action="clear" aria-label="清空日志"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-clear"/></svg></button><button type="button" class="lp-iconbutton" data-action="export" aria-label="导出日志"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-export"/></svg></button></div>
+          </div>
+          <div class="lp-loglines" data-log role="log" aria-label="演示串口日志"></div>
+          <div class="lp-commandbar">
+            <div class="lp-logcontrols">
+              <select data-format aria-label="日志格式"><option value="text">文本</option><option value="hex">HEX</option></select>
+              <input class="lp-filter" type="search" placeholder="筛选日志…" aria-label="筛选串口日志" data-filter>
+            </div>
+            <form class="lp-send">
+              <input name="command" type="text" autocomplete="off" placeholder="输入命令…" aria-label="发送内容">
+              <select name="ending" aria-label="行尾"><option value="crlf">CRLF</option><option value="lf">LF</option><option value="cr">CR</option><option value="none">无行尾</option></select>
+              <button type="submit" class="lp-iconbutton lp-primary" data-send aria-label="发送"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-send"/></svg></button>
+            </form>
+          </div>
+        </section>
+        <p class="lp-notice" data-notice aria-live="polite">演示：连接与日志仅用于评审，不访问真实设备。</p>
+      </section>
+      <section class="lp-workspace" aria-label="插件" data-screen="plugins" hidden>
+        <div class="lp-sectionhead"><h2>插件</h2><span class="lp-caption">0 个已安装</span></div>
+        <div class="lp-pluginempty"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-plugin"/></svg><strong>暂无插件</strong></div>
+      </section>
+      </div>
+    </main>
+    <span class="lp-sr-only" data-sync-state role="status"></span>
+  </div>
+  <dialog class="lp-settings" data-settings-dialog aria-labelledby="lp-settings-title">
+    <div class="lp-settings-head"><h2 id="lp-settings-title">设置</h2><div class="lp-inline"><span class="lp-settings-status" data-preference-status role="status"></span><button type="button" class="lp-iconbutton" data-settings-close aria-label="关闭设置"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-close"/></svg></button></div></div>
+    <div class="lp-settings-body">
+      <div class="lp-settings-section">
+      <label class="lp-setting"><span>文字大小</span><select data-preference="fontSize" aria-label="文字大小"><option value="11">11 px</option><option value="12">12 px</option><option value="13" selected>13 px</option><option value="14">14 px</option><option value="15">15 px</option><option value="16">16 px</option><option value="17">17 px</option><option value="18">18 px</option></select></label>
+      <label class="lp-setting"><span>语言</span><select data-preference="language" aria-label="语言"><option value="zh-CN">简体中文</option><option value="en">English</option></select></label>
+      <label class="lp-setting"><span>主题</span><select data-preference="theme" aria-label="主题"><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></label>
+      </div>
+      <div class="lp-settings-section">
+      <label class="lp-setting"><span>关闭后后台运行</span><input class="lp-switch" type="checkbox" role="switch" data-preference="closeToTray" checked aria-label="关闭后后台运行"></label>
+      <label class="lp-setting"><span>后台检查并下载更新</span><input class="lp-switch" type="checkbox" role="switch" data-preference="autoUpdate" checked aria-label="后台检查并下载更新"></label>
+      </div>
+      <div class="lp-settings-section">
+        <div class="lp-setting"><div class="lp-setting-info"><span>Tailscale</span><span class="lp-settings-status" data-tail-status>桌面版中登录</span></div><button type="button" data-settings-login>登录 Tailscale</button></div>
+        <div class="lp-setting"><div class="lp-setting-info"><span>Linkport <code>0.0.1</code></span><span class="lp-settings-status" data-update-status>桌面版中检查更新</span></div><button type="button" class="lp-iconbutton" data-update-action aria-label="检查更新"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-refresh"/></svg></button></div>
+      </div>
+    </div>
+  </dialog>
+  <dialog class="lp-settings" data-connect-dialog aria-labelledby="lp-connect-title">
+    <div class="lp-settings-head"><h2 id="lp-connect-title">连接串口</h2><button type="button" class="lp-iconbutton" data-connect-cancel aria-label="关闭连接设置"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-close"/></svg></button></div>
+    <form class="lp-connect-form">
+      <p class="lp-caption" data-connect-target></p>
+      <label class="lp-local-port-picker" data-local-monitor-field hidden><span>本机串口</span><select name="localPort" aria-label="本机串口"></select></label>
+      <label class="lp-setting"><span>波特率</span><input type="number" min="1" max="4000000" value="115200" name="baudRate" required aria-label="波特率"></label>
+      <div data-windows-pair hidden>
+        <label class="lp-setting"><span>本地 COM 端口</span><input name="path" placeholder="COM10" aria-label="本地 COM 端口"></label>
+        <label class="lp-setting"><span>com0com 配对端口</span><input name="pairDevice" placeholder="CNCB0" aria-label="com0com 配对端口"></label>
+      </div>
+      <p class="lp-settings-status" data-connect-error role="alert"></p>
+      <div class="lp-connect-actions"><button type="button" data-connect-cancel>取消</button><button type="submit" class="lp-primary" data-connect-submit>连接</button></div>
+    </form>
+  </dialog>
+  <div class="lp-live-toast" role="status" data-live-toast hidden></div>
+</div>
+<script>
+(() => {
+  const root = document.getElementById("linkport-review");
+  const find = selector => root.querySelector(selector);
+  const all = selector => [...root.querySelectorAll(selector)];
+  const nativeDesktop = document.querySelector('meta[name="linkport-desktop"]')?.content === "true";
+  const nativeToken = document.querySelector('meta[name="linkport-api-token"]')?.content || "";
+  let drawCurves = () => {};
+  if (!nativeDesktop) {
+  for (const template of all("template[data-demo-shares], template[data-demo-devices]")) template.replaceWith(template.content.cloneNode(true));
+  find("[data-host-name]").textContent = "dev-machine";
+  find("[data-host-ip]").textContent = "100.101.10.8";
+  find("[data-discovery-summary]").textContent = "2 台可用 · 1 台离线";
+  find("[data-network-state]").textContent = "Tailscale 已连接";
+  const portDetails = {
+    esp32: { host: "lab-linux", label: "ESP32 调试板", remotePath: "/dev/ttyUSB0", mount: "lab-esp32", baud: "115200" },
+    stm32: { host: "lab-linux", label: "STM32 控制板", remotePath: "/dev/ttyACM0", mount: "lab-stm32", baud: "115200" },
+    uart: { host: "bench-windows", label: "USB UART", remotePath: "COM3", mount: "bench-uart", baud: "9600" }
+  };
+  const hostPlatform = document.querySelector('meta[name="linkport-host-platform"]')?.content;
+  const platform = ({ windows: "Windows", linux: "Linux", darwin: "macOS" })[hostPlatform] || "macOS";
+  let selectedPort = "esp32";
+  let online = true;
+  let localInserted = false;
+  const initialRecords = [
+    { time: "10:24:31.002", kind: "SYS", message: "已连接 lab-linux / ttyUSB0，开始监听" },
+    { time: "10:24:31.018", kind: "RX", message: "ESP-ROM:esp32s3-20210327" },
+    { time: "10:24:31.021", kind: "RX", message: "rst:0x1 (POWERON), boot:0x8 (SPI_FAST_FLASH_BOOT)" },
+    { time: "10:24:31.126", kind: "RX", message: "I (124) main: firmware v0.8.2 / debug build" },
+    { time: "10:24:31.240", kind: "RX", message: "I (238) uart: console ready @ 115200 baud" },
+    { time: "10:24:32.005", kind: "TX", message: "help\r\n" },
+    { time: "10:24:32.019", kind: "RX", message: "Available commands: help, status, reboot" },
+    { time: "10:24:32.021", kind: "RX", message: "esp32> " }
+  ];
+  const sessions = new Map([["esp32", { connected: true, slot: 10, paused: false, pausedSnapshot: null, records: initialRecords }]]);
+  let nextSlot = 11;
+  const isConnected = identity => Boolean(sessions.get(identity)?.connected);
+  const isOffline = identity => identity === "esp32" && !online;
+  const logContainer = find("[data-log]");
+  let activePaths = [];
+  function drawDemoCurves() {
+    const layout = find(".lp-topology");
+    const canvas = find(".lp-connections");
+    const bounds = layout.getBoundingClientRect();
+    if (!bounds.width || !bounds.height) return;
+    canvas.setAttribute("viewBox", "0 0 " + bounds.width + " " + bounds.height);
+    canvas.replaceChildren();
+    activePaths = [];
+    const local = find(".lp-local").getBoundingClientRect();
+    const path = (commands, identities) => {
+      const communicating = identities.filter(identity => isConnected(identity) && !isOffline(identity));
+      const element = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      element.setAttribute("d", commands);
+      if (communicating.length) element.dataset.link = "active";
+      canvas.append(element);
+      if (communicating.length) activePaths.push({ commands, identities: communicating });
+    };
+    for (const device of all(".lp-device")) {
+      const machine = device.querySelector(".lp-machine").getBoundingClientRect();
+      {
+        const sideBySide = machine.left >= local.right;
+        const startX = (sideBySide ? local.right : local.left + local.width / 2) - bounds.left;
+        const startY = (sideBySide ? local.top + local.height / 2 : local.bottom) - bounds.top;
+        const endX = machine.left - bounds.left;
+        const endY = machine.top + machine.height / 2 - bounds.top;
+        const bend = sideBySide ? Math.max(18, (endX - startX) * .6) : 24;
+        const firstControl = sideBySide ? `${startX + bend} ${startY}` : `${startX} ${startY + bend}`;
+        path(`M ${startX} ${startY} C ${firstControl}, ${endX - bend} ${endY}, ${endX} ${endY}`, [...device.querySelectorAll("[data-port]")].map(port => port.dataset.port));
+      }
+      for (const port of device.querySelectorAll(".lp-portrow")) {
+        if (!port.getClientRects().length) continue;
+        const destination = port.getBoundingClientRect();
+        const startX = machine.left + 12 - bounds.left;
+        const startY = machine.bottom - bounds.top;
+        const endX = destination.left - bounds.left;
+        const endY = destination.top + destination.height / 2 - bounds.top;
+        path(`M ${startX} ${startY} C ${startX} ${endY}, ${startX} ${endY}, ${endX} ${endY}`, [port.dataset.port]);
+      }
+    }
+  }
+  drawCurves = drawDemoCurves;
+  function animateTraffic(direction, identity) {
+    if (!isConnected(identity) || isOffline(identity) || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    for (const route of activePaths.filter(route => route.identities.includes(identity))) {
+      const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      dot.setAttribute("r", "2.5");
+      dot.setAttribute("class", "lp-traffic-dot");
+      dot.dataset.direction = direction;
+      const motion = document.createElementNS("http://www.w3.org/2000/svg", "animateMotion");
+      motion.setAttribute("path", route.commands);
+      motion.setAttribute("dur", "1.1s");
+      motion.setAttribute("fill", "freeze");
+      motion.setAttribute("keyPoints", direction === "RX" ? "1;0" : "0;1");
+      motion.setAttribute("keyTimes", "0;1");
+      motion.setAttribute("calcMode", "linear");
+      dot.append(motion);
+      find(".lp-connections").append(dot);
+      motion.beginElement();
+      setTimeout(() => dot.remove(), 1150);
+    }
+  }
+  const currentTime = () => new Date().toLocaleTimeString("en-GB", { hour12: false }) + ".000";
+  function drawLogs() {
+    const session = sessions.get(selectedPort);
+    const keyword = find("[data-filter]").value.toLowerCase();
+    const hex = find("[data-format]").value === "hex";
+    logContainer.replaceChildren();
+    const records = session ? (session.paused ? session.pausedSnapshot : session.records) : [];
+    const visible = records.filter(record => (record.kind + " " + record.message).toLowerCase().includes(keyword));
+    for (const record of visible) {
+      const row = document.createElement("div");
+      row.className = "lp-logline";
+      row.dataset.kind = record.kind;
+      const time = document.createElement("time");
+      time.textContent = record.time;
+      const direction = document.createElement("span");
+      direction.className = "lp-direction";
+      direction.textContent = record.kind;
+      const message = document.createElement("span");
+      message.className = "lp-message";
+      message.textContent = hex && record.kind !== "SYS"
+        ? [...new TextEncoder().encode(record.message)].map(value => value.toString(16).padStart(2, "0")).join(" ")
+        : record.message.replace(/\r/g, "\\r").replace(/\n/g, "\\n");
+      row.append(time, direction, message);
+      logContainer.append(row);
+    }
+    if (!visible.length) {
+      const empty = document.createElement("div");
+      empty.className = "lp-empty";
+      empty.textContent = keyword ? "没有匹配的日志" : (session ? "暂无日志，等待此会话的数据" : "先在连接区连接一个远端串口");
+      logContainer.append(empty);
+    }
+    logContainer.scrollTop = logContainer.scrollHeight;
+  }
+  function append(kind, message, identity = selectedPort) {
+    const session = sessions.get(identity);
+    if (!session) return;
+    session.records.push({ time: currentTime(), kind, message });
+    session.records = session.records.slice(-300);
+    if (identity === selectedPort && !session.paused) drawLogs();
+    if (kind === "RX" || kind === "TX") animateTraffic(kind, identity);
+  }
+  function drawConnection() {
+    for (const row of all("[data-port]")) {
+      const connected = isConnected(row.dataset.port);
+      const detached = row.dataset.port === "esp32" && !online;
+      const caption = row.querySelector(".lp-portdesc .lp-caption");
+      const chips = { esp32: "CP2102", stm32: "ST-Link", uart: "CH340" };
+      caption.textContent = chips[row.dataset.port] + " · " + (detached ? "设备已拔出" : connected ? portDetails[row.dataset.port].baud + " · 8N1" : "空闲");
+      row.dataset.active = String(connected);
+      const state = row.querySelector("[data-state]");
+      state.hidden = !connected && !detached;
+      state.textContent = detached ? "设备离线" : "已连接";
+      state.style.color = detached ? "var(--lp-warn)" : "";
+      const button = row.querySelector("[data-connect]");
+      button.classList.toggle("lp-primary", !connected && !detached);
+      button.setAttribute("aria-label", (connected ? "断开 " : "连接 ") + portDetails[row.dataset.port].label);
+      button.querySelector("use").setAttribute("href", connected ? "#lp-icon-disconnect" : "#lp-icon-link");
+      button.disabled = detached && !connected;
+    }
+    const details = portDetails[selectedPort];
+    const selected = sessions.get(selectedPort);
+    const isWindows = platform === "Windows";
+    const connectedSessions = [...sessions].filter(([, session]) => session.connected);
+    const mappings = find("[data-mappings]");
+    mappings.replaceChildren();
+    find("[data-connection-count]").textContent = connectedSessions.length + " 条连接";
+    for (const [identity, session] of connectedSessions) {
+      const port = portDetails[identity];
+      const row = document.createElement("div");
+      row.className = "lp-mapping";
+      row.dataset.mapping = identity;
+      const source = document.createElement("div");
+      source.className = "lp-mapping-source";
+      source.textContent = port.label;
+      const host = document.createElement("span");
+      host.textContent = port.host + " · " + port.remotePath + (isOffline(identity) ? " · 等待重连" : "");
+      source.append(host);
+      const arrow = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      arrow.classList.add("lp-icon");
+      arrow.setAttribute("aria-hidden", "true");
+      const arrowShape = document.createElementNS("http://www.w3.org/2000/svg", "use");
+      arrowShape.setAttribute("href", "#lp-icon-arrow");
+      arrow.append(arrowShape);
+      const path = document.createElement("code");
+      path.textContent = isWindows ? "COM" + session.slot : "~/.linkport/dev/" + port.mount;
+      const capability = document.createElement("span");
+      capability.className = "lp-capability";
+      capability.textContent = isWindows ? "COM" : "PTY";
+      capability.setAttribute("aria-label", isWindows ? "使用独立的 com0com 端口对" : "PTY 映射不支持 DTR/RTS 透传");
+      row.append(source, arrow, path, capability);
+      mappings.append(row);
+    }
+    if (!connectedSessions.length) {
+      const empty = document.createElement("p");
+      empty.className = "lp-caption";
+      empty.textContent = "尚未建立串口连接。每条连接会获得独立的本地映射。";
+      mappings.append(empty);
+    }
+    const picker = find("[data-session-select]");
+    picker.replaceChildren();
+    for (const [identity, session] of sessions) {
+      const option = document.createElement("option");
+      option.value = identity;
+      option.textContent = portDetails[identity].host + " / " + portDetails[identity].label + (!session.connected ? " · 已断开" : isOffline(identity) ? " · 离线" : "");
+      option.selected = identity === selectedPort;
+      picker.append(option);
+    }
+    picker.disabled = !sessions.size;
+    const detached = isOffline(selectedPort);
+    find("[data-session-label]").textContent = details ? details.host + " / " + details.label : "选择一个串口开始监听";
+    find("[data-session-status]").textContent = !selected?.connected ? "未连接" : detached ? "等待重连" : (selected.paused ? "显示已暂停" : "监听中");
+    find("[data-send]").disabled = !selected?.connected || detached;
+    find(".lp-send input").disabled = !selected?.connected || detached;
+    find('[data-action="pause"]').disabled = !selected;
+    find('[data-action="pause"]').setAttribute("aria-label", selected?.paused ? "继续显示" : "暂停显示");
+    find('[data-action="pause"] use').setAttribute("href", selected?.paused ? "#lp-icon-play" : "#lp-icon-pause");
+    find("[data-notice]").textContent = !selected
+      ? "先在连接区连接一个串口，再选择要监听的会话。"
+      : !selected.connected
+        ? "此会话已断开，保留已有日志；其他会话继续工作。"
+        : detached
+          ? "此串口离线，保留日志和映射并等待重连；其他会话继续工作。"
+          : selected.paused
+            ? "此会话的显示已暂停，数据仍会进入缓冲；点击继续显示可看到新数据。"
+            : "演示数据。当前只显示所选会话的日志，清空和发送也仅作用于此会话。";
+    const localNames = isWindows ? { usb: "COM5", bt: "COM6", new: "COM7" } : (platform === "Linux" ? { usb: "/dev/ttyUSB0", bt: "/dev/rfcomm0", new: "/dev/ttyACM0" } : { usb: "/dev/cu.usbserial-110", bt: "/dev/cu.Bluetooth-Incoming-Port", new: "/dev/cu.usbmodem-210" });
+    for (const label of all("[data-local-port]")) label.textContent = localNames[label.dataset.localPort];
+    drawCurves();
+  }
+  function drawSharing() {
+    find("[data-new-device]").hidden = !localInserted && !find('[data-share="new"]').checked;
+    const checked = all("[data-share]").filter(input => input.checked && !input.closest(".lp-shareitem").hidden);
+    const available = checked.filter(input => input.dataset.share !== "new" || localInserted).length;
+    const offline = checked.length - available;
+    find("[data-share-count]").textContent = available + " 个共享" + (offline ? " · " + offline + " 个离线" : "");
+    for (const input of all("[data-share]")) {
+      const label = input.parentElement.querySelector(".lp-sharestatus");
+      label.textContent = input.checked ? (input.dataset.share === "new" && !localInserted ? "已共享 · 离线" : "共享中") : "未共享";
+      label.classList.toggle("lp-sharing", input.checked);
+      label.classList.toggle("lp-sr-only", !(input.checked && input.dataset.share === "new" && !localInserted));
+    }
+  }
+  for (const button of all("[data-expand]")) button.addEventListener("click", () => {
+    const panel = find("#" + button.dataset.expand);
+    panel.hidden = !panel.hidden;
+    button.setAttribute("aria-expanded", String(!panel.hidden));
+    drawCurves();
+  });
+  for (const button of all("[data-connect]")) button.addEventListener("click", () => {
+    const next = button.dataset.connect;
+    const existing = sessions.get(next);
+    if (existing?.connected) {
+      existing.connected = false;
+      drawConnection();
+      append("SYS", "已断开此串口，本地映射已释放，其他会话不受影响（演示）", next);
+    } else {
+      if (existing) existing.connected = true;
+      else sessions.set(next, { connected: true, slot: nextSlot++, paused: false, pausedSnapshot: null, records: [] });
+      selectedPort = next;
+      drawConnection();
+      append("SYS", "已连接 " + portDetails[next].host + " / " + portDetails[next].label + "（演示）", next);
+      append("RX", "console ready>", next);
+    }
+    drawLogs();
+  });
+  find('[data-action="pause"]').addEventListener("click", event => {
+    const session = sessions.get(selectedPort);
+    if (!session) return;
+    session.paused = !session.paused;
+    session.pausedSnapshot = session.paused ? [...session.records] : null;
+    drawConnection();
+    drawLogs();
+  });
+  find('[data-action="clear"]').addEventListener("click", () => {
+    const session = sessions.get(selectedPort);
+    if (!session) return;
+    session.records = [];
+    if (session.paused) session.pausedSnapshot = [];
+    drawLogs();
+  });
+  find("[data-session-select]").addEventListener("change", event => {
+    selectedPort = event.target.value;
+    drawConnection();
+    drawLogs();
+  });
+  function showScreen(name) {
+    for (const screen of all("[data-screen]")) screen.hidden = screen.dataset.screen !== name;
+    for (const button of all("[data-nav]")) {
+      if (button.dataset.nav === name) button.setAttribute("aria-current", "page");
+      else button.removeAttribute("aria-current");
+    }
+    drawCurves();
+  }
+  for (const button of all("[data-nav]")) button.addEventListener("click", () => showScreen(button.dataset.nav));
+  find("[data-filter]").addEventListener("input", drawLogs);
+  find("[data-format]").addEventListener("change", drawLogs);
+  find(".lp-send").addEventListener("submit", event => {
+    event.preventDefault();
+    if (!isConnected(selectedPort) || isOffline(selectedPort)) return;
+    const form = event.currentTarget;
+    const message = form.elements.command.value;
+    if (!message) return;
+    const endings = { crlf: "\r\n", cr: "\r", lf: "\n", none: "" };
+    append("TX", message + endings[form.elements.ending.value]);
+    append("RX", message.trim() === "help" ? "Available commands: help, status, reboot" : "demo: " + message);
+    form.elements.command.value = "";
+    find("[data-notice]").textContent = sessions.get(selectedPort).paused ? "已模拟发送，当前会话显示暂停中；点击继续显示查看回应。" : "已模拟发送并生成回应，未向真实串口发送。";
+  });
+  find('[data-action="export"]').addEventListener("click", () => {
+    const records = sessions.get(selectedPort)?.records || [];
+    const content = records.map(record => "[" + record.time + "] " + record.kind + " " + record.message).join("\n");
+    const anchor = document.createElement("a");
+    const url = URL.createObjectURL(new Blob([content], { type: "text/plain;charset=utf-8" }));
+    anchor.href = url;
+    anchor.download = "linkport-demo-" + (selectedPort || "empty") + ".log";
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    find("[data-notice]").textContent = "已请求导出演示日志；若预览环境禁止下载，可在独立预览中导出。";
+  });
+  for (const input of all("[data-share]")) input.addEventListener("change", () => {
+    drawSharing();
+  });
+  for (const button of all("[data-refresh]")) button.addEventListener("click", () => {
+    button.dataset.refreshing = "true";
+    button.disabled = true;
+    find("[data-sync-state]").textContent = "刷新中";
+    setTimeout(() => {
+      if (button.dataset.refresh === "share") drawSharing();
+      else drawConnection();
+      button.dataset.refreshing = "false";
+      button.disabled = false;
+      find("[data-sync-state]").textContent = "已同步";
+    }, 450);
+  });
+  drawLogs();
+  drawConnection();
+  drawSharing();
+  const scene = new URLSearchParams(window.location.search).get("scene");
+  const scenes = {
+    "tailscale-missing": { status: "Tailscale 未安装", title: "先连接到你的 Tailscale 网络", copy: "请在本机安装 Tailscale 并登录，再回到这里发现其他机器。" },
+    "tailscale-offline": { status: "Tailscale 未连接", title: "本机尚未连接网络", copy: "请在 Tailscale 中开启连接。恢复后会自动刷新可访问的机器。" },
+    "service-missing": { status: "Tailscale 已连接", title: "尚未发现 Linkport 共享服务", copy: "请在对端安装并启动 Linkport，再选择允许共享的串口。" },
+    "ports-empty": { status: "Tailscale 已连接", title: "对端尚未共享串口", copy: "已发现 lab-linux。请在对端的「共享」中勾选一个串口，本机列表会自动更新。" }
+  };
+  if (scenes[scene]) {
+    const state = scenes[scene];
+    selectedPort = null;
+    sessions.clear();
+    drawConnection();
+    drawLogs();
+    for (const element of all(".lp-topology, .lp-mapping-heading, [data-mappings]")) element.hidden = true;
+    find('[data-refresh="connect"]').hidden = true;
+    find("[data-connection-empty]").hidden = false;
+    find("[data-empty-title]").textContent = state.title;
+    find("[data-empty-copy]").textContent = state.copy;
+    find("[data-network-state]").textContent = state.status;
+    if (scene.startsWith("tailscale-")) find("[data-network-state]").style.color = "var(--lp-warn)";
+    find("[data-discovery-summary]").textContent = scene === "ports-empty" ? "1 台设备 · 0 个共享串口" : "等待服务就绪";
+  }
+  if (scene === "local-new" || scene === "local-offline") {
+    localInserted = scene === "local-new";
+    find('[data-share="new"]').checked = scene === "local-offline";
+    drawSharing();
+    showScreen("share");
+  }
+  if (scene === "port-offline") {
+    online = false;
+    find("[data-lab-state]").textContent = "1 个可用 · 1 个离线";
+    append("SYS", "ESP32 已离线，保留映射并等待重连。", "esp32");
+    drawConnection();
+  }
+  const curveObserver = new ResizeObserver(drawCurves);
+  for (const element of all(".lp-topology, .lp-local, .lp-devices, .lp-porttree")) curveObserver.observe(element);
+  document.fonts.ready.then(drawCurves);
+  }
+  const defaults = { fontSize: 13, language: "zh-CN", theme: "system", closeToTray: true, autoUpdate: true };
+  let preferences = { ...defaults };
+  let preferenceRevision = 0;
+  let saveQueue = Promise.resolve();
+  let updateState = { configured: false, state: "unconfigured" };
+  let tailState = null;
+  let settingsPoll = null;
+  const settingsDialog = find("[data-settings-dialog]");
+  try {
+    const saved = JSON.parse(localStorage.getItem("linkport-preferences") || "{}");
+    if (Number.isInteger(saved.fontSize) && saved.fontSize >= 11 && saved.fontSize <= 18 &&
+        ["zh-CN", "en"].includes(saved.language) && ["system", "light", "dark"].includes(saved.theme)) {
+      preferences = { ...defaults, ...saved };
+    }
+  } catch {}
+  async function nativeRequest(path, method = "GET", value) {
+    const response = await fetch("/native/v1/" + path, {
+      method,
+      headers: { "X-Linkport-Token": nativeToken, "Content-Type": "application/json" },
+      body: value === undefined ? undefined : JSON.stringify(value)
+    });
+    if (!response.ok) {
+      const message = (await response.text()).trim().slice(0, 512);
+      throw new Error(message || "操作失败，请重试");
+    }
+    return response.status === 202 || response.status === 204 ? null : response.json();
+  }
+  const translations = {
+    "关闭窗口后保留状态栏": "Keep in menu bar when window closes",
+    "关闭后后台运行": "Keep running in background",
+    "连接串口": "Connect serial port",
+    "监听本机串口": "Monitor local port",
+    "本机串口": "Local serial port",
+    "开始监听": "Start monitoring",
+    "正在打开": "Opening",
+    "关闭串口": "Close port",
+    "选择一个串口开始监听": "Choose a serial port to monitor",
+    "关闭连接设置": "Close connection settings",
+    "波特率": "Baud rate",
+    "本地 COM 端口": "Local COM port",
+    "com0com 配对端口": "com0com paired port",
+    "取消": "Cancel",
+    "正在连接": "Connecting",
+    "未登录 Tailscale": "Sign in to Tailscale",
+    "尚未发现其他设备": "No other devices found",
+    "服务不可达": "Service unreachable",
+    "版本不兼容": "Incompatible version",
+    "没有共享串口": "No shared ports",
+    "串口身份不明确": "Ambiguous serial identity",
+    "未检测到串口": "No serial ports found",
+    "暂无会话": "No sessions",
+    "导出完整会话": "Export full session",
+    "演示数据": "Demo data",
+    "后台检查并下载更新": "Check and download updates in background",
+    "设计预览 · 演示数据": "Design preview · Demo data",
+    "请在浏览器中完成登录": "Complete sign-in in your browser",
+    "桌面版中检查更新": "Check updates in the desktop app",
+    "当前没有可用更新": "You are up to date",
+    "发布签名未配置": "Release signing is not configured",
+    "桌面版中登录": "Sign in from the desktop app",
+    "刷新本机串口": "Refresh local ports",
+    "关闭设置": "Close settings",
+    "文字大小": "Text size",
+    "简体中文": "Simplified Chinese",
+    "跟随系统": "System",
+    "登录 Tailscale": "Sign in to Tailscale",
+    "连接 Tailscale": "Connect to Tailscale",
+    "Tailscale 状态待确认": "Tailscale status unavailable",
+    "安装 Tailscale": "Install Tailscale",
+    "未安装 Tailscale": "Tailscale is not installed",
+    "Tailscale 已连接": "Tailscale connected",
+    "Tailscale 未连接": "Tailscale disconnected",
+    "Tailscale 不可用": "Tailscale unavailable",
+    "无法读取状态": "Unable to read status",
+    "操作失败，请重试": "Action failed. Please try again.",
+    "重启并更新": "Restart to update",
+    "正在检查更新": "Checking for updates",
+    "正在下载": "Downloading",
+    "正在校验": "Verifying",
+    "准备更新": "Preparing update",
+    "更新已就绪": "Update ready",
+    "发现新版本": "New version available",
+    "下载更新": "Download update",
+    "检查更新": "Check for updates",
+    "设备与串口": "Devices and ports",
+    "本地映射": "Local ports",
+    "设备离线": "Device offline",
+    "等待重连": "Waiting to reconnect",
+    "已断开": "Disconnected",
+    "未连接": "Not connected",
+    "已连接": "Connected",
+    "显示已暂停": "Display paused",
+    "暂停显示": "Pause display",
+    "继续显示": "Resume display",
+    "清空日志": "Clear log",
+    "导出日志": "Export log",
+    "筛选串口日志": "Filter serial log",
+    "筛选日志…": "Filter logs…",
+    "输入命令…": "Enter command…",
+    "日志格式": "Log format",
+    "监听会话": "Monitor session",
+    "刷新设备": "Refresh devices",
+    "暂无插件": "No plugins installed",
+    "保存中…": "Saving…",
+    "已保存": "Saved",
+    "保存失败": "Unable to save",
+    "监听中": "Monitoring",
+    "共享中": "Shared",
+    "未共享": "Not shared",
+    "刷新中": "Refreshing",
+    "已同步": "Synced",
+    "设置": "Settings",
+    "语言": "Language",
+    "主题": "Theme",
+    "浅色": "Light",
+    "深色": "Dark",
+    "连接": "Connect",
+    "断开": "Disconnect",
+    "共享": "Share",
+    "监听": "Monitor",
+    "插件": "Plugins",
+    "本机": "Local",
+    "空闲": "Idle",
+    "离线": "Offline",
+    "发送": "Send",
+    "行尾": "Line ending",
+    "文本": "Text"
+  };
+  const translationKeys = Object.keys(translations).sort((first, second) => second.length - first.length);
+  const textSources = new WeakMap();
+  const attributeSources = new WeakMap();
+  function translate(value) {
+    if (preferences.language !== "en") return value;
+    let result = value.replace(/(\d+) 条连接/g, (_, count) => count + (count === "1" ? " connection" : " connections"))
+      .replace(/(\d+) 个共享串口/g, (_, count) => count + (count === "1" ? " shared port" : " shared ports")).replace(/(\d+) 个共享/g, "$1 shared")
+      .replace(/(\d+) 台可用/g, "$1 available").replace(/(\d+) (?:个|台)离线/g, "$1 offline")
+      .replace(/(\d+) 台设备/g, "$1 devices").replace(/(\d+) 个已安装/g, "$1 installed")
+      .replace(/(\d+) 分钟前/g, "$1 min ago");
+    for (const key of translationKeys) result = result.split(key).join(translations[key]);
+    return result;
+  }
+  function applyLanguage() {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let node;
+    while ((node = walker.nextNode())) {
+      if (node.parentElement?.closest("script, style, code, .lp-loglines")) continue;
+      const prior = textSources.get(node);
+      const source = prior && node.nodeValue === prior.output ? prior.source : node.nodeValue;
+      const output = translate(source);
+      textSources.set(node, { source, output });
+      if (node.nodeValue !== output) node.nodeValue = output;
+    }
+    for (const element of all("[aria-label], [placeholder]")) {
+      const prior = attributeSources.get(element) || {};
+      for (const name of ["aria-label", "placeholder"]) {
+        if (!element.hasAttribute(name)) continue;
+        const current = element.getAttribute(name);
+        const source = prior[name] && current === prior[name].output ? prior[name].source : current;
+        const output = translate(source);
+        prior[name] = { source, output };
+        if (current !== output) element.setAttribute(name, output);
+      }
+      attributeSources.set(element, prior);
+    }
+  }
+  function applyPreferences() {
+    root.style.setProperty("--lp-font-scale", String(preferences.fontSize / 13));
+    const appearance = preferences.theme === "system" ? "light dark" : preferences.theme;
+    document.documentElement.style.colorScheme = appearance;
+    document.body.style.colorScheme = appearance;
+    root.style.colorScheme = appearance;
+    document.documentElement.lang = preferences.language;
+    for (const input of all("[data-preference]")) {
+      const value = preferences[input.dataset.preference];
+      if (input.type === "checkbox") input.checked = Boolean(value);
+      else input.value = String(value);
+    }
+    applyLanguage();
+    drawCurves();
+  }
+  for (const input of all("[data-preference]")) input.addEventListener("change", () => {
+    const key = input.dataset.preference;
+    preferences[key] = input.type === "checkbox" ? input.checked : key === "fontSize" ? Number(input.value) : input.value;
+    preferenceRevision++;
+    applyPreferences();
+    const snapshot = { ...preferences };
+    find("[data-preference-status]").textContent = "保存中…";
+    saveQueue = saveQueue.catch(() => {}).then(async () => {
+      if (nativeDesktop) await nativeRequest("preferences", "PUT", snapshot);
+      else localStorage.setItem("linkport-preferences", JSON.stringify(snapshot));
+      if (JSON.stringify(snapshot) === JSON.stringify(preferences)) find("[data-preference-status]").textContent = "已保存";
+    }).catch(() => { find("[data-preference-status]").textContent = "保存失败"; });
+  });
+  async function refreshTail() {
+    if (!nativeDesktop) return;
+    try {
+      tailState = await nativeRequest("tailscale");
+      find("[data-network-state]").textContent = tailState.stale ? "Tailscale 状态待确认" : tailState.state === "Running" ? "Tailscale 已连接" : tailState.state === "NeedsLogin" ? "未登录 Tailscale" : tailState.installed ? "Tailscale 未连接" : "登录 Tailscale";
+      find("[data-tail-status]").textContent = tailState.loggingIn ? "请在浏览器中完成登录" : tailState.error ? "无法读取状态" : tailState.state === "Running" ? "已连接" : tailState.installed ? "未连接" : "未安装 Tailscale";
+      find("[data-settings-login]").textContent = tailState.state === "Stopped" ? "连接 Tailscale" : tailState.installed ? "登录 Tailscale" : "安装 Tailscale";
+      find("[data-settings-login]").disabled = tailState.loggingIn;
+      find("[data-host-name]").textContent = tailState.hostName || "本机";
+      find("[data-host-ip]").textContent = tailState.ips?.[0] || "—";
+    } catch { find("[data-tail-status]").textContent = "无法读取状态"; }
+  }
+  async function refreshUpdate() {
+    if (!nativeDesktop) return;
+    try {
+      updateState = await nativeRequest("update");
+      const labels = { unconfigured: "发布签名未配置", idle: "检查更新", checking: "正在检查更新", "up-to-date": "当前没有可用更新", available: "发现新版本", downloading: "正在下载", verifying: "正在校验", installing: "准备更新", ready: "更新已就绪", error: "操作失败，请重试" };
+      find("[data-update-status]").textContent = (labels[updateState.state] || updateState.state) + (updateState.next ? " · " + updateState.next : "");
+      const button = find("[data-update-action]");
+      button.disabled = !updateState.configured || ["checking", "downloading", "verifying", "installing"].includes(updateState.state);
+      button.setAttribute("aria-label", updateState.state === "ready" ? "重启并更新" : updateState.state === "available" ? "下载更新" : "检查更新");
+    } catch { find("[data-update-status]").textContent = "操作失败，请重试"; }
+  }
+  function openSettings() {
+    if (!settingsDialog.open) settingsDialog.showModal();
+    refreshTail();
+    refreshUpdate();
+    if (nativeDesktop && !settingsPoll) settingsPoll = setInterval(() => { refreshTail(); refreshUpdate(); }, 3000);
+  }
+  find("[data-settings-open]").addEventListener("click", openSettings);
+  find("[data-settings-close]").addEventListener("click", () => settingsDialog.close());
+  settingsDialog.addEventListener("close", () => { clearInterval(settingsPoll); settingsPoll = null; });
+  async function loginTailscale() {
+    if (!nativeDesktop) {
+      openSettings();
+      find("[data-tail-status]").textContent = "桌面版中登录";
+      return;
+    }
+    try {
+      await nativeRequest("tailscale/login", "POST");
+      find("[data-tail-status]").textContent = "请在浏览器中完成登录";
+      refreshTail();
+    } catch { find("[data-tail-status]").textContent = "操作失败，请重试"; }
+  }
+  find("[data-settings-login]").addEventListener("click", loginTailscale);
+  find("[data-tailscale-login]").addEventListener("click", () => {
+    if (tailState?.state === "Running") openSettings();
+    else loginTailscale();
+  });
+  find("[data-update-action]").addEventListener("click", async () => {
+    if (!nativeDesktop) {
+      find("[data-update-status]").textContent = "桌面版中检查更新";
+      return;
+    }
+    const operation = updateState.state === "ready" ? "restart" : updateState.state === "available" ? "download" : "check";
+    try { await nativeRequest("update/" + operation, "POST"); refreshUpdate(); }
+    catch { find("[data-update-status]").textContent = "操作失败，请重试"; }
+  });
+  const languageObserver = new MutationObserver(applyLanguage);
+  languageObserver.observe(root, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["aria-label", "placeholder"] });
+  applyPreferences();
+  if (nativeDesktop) {
+    drawCurves = globalThis.initializeLinkportLive(root, nativeRequest);
+    const revision = preferenceRevision;
+    nativeRequest("preferences").then(saved => {
+      if (preferenceRevision === revision) { preferences = saved; applyPreferences(); }
+    }).catch(() => { find("[data-preference-status]").textContent = "保存失败"; });
+    refreshTail();
+    setInterval(refreshTail, 15000);
+  }
+  if (globalThis.Tweak) {
+    const tweaks = { spacing: 20 };
+    const tweak = new Tweak({ container: root, onChange: () => {
+      for (const panel of all(".lp-workspace")) panel.style.padding = tweaks.spacing + "px";
+    } });
+    tweak.addSlider(tweaks, "spacing", { label: "工作区留白", min: 12, max: 28, unit: "px" });
+  }
+})();
+</script>

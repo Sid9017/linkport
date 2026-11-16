@@ -1,0 +1,131 @@
+name: Draft release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to validate and build (e.g. v0.0.1)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    outputs:
+      commit: ${{ steps.source.outputs.commit }}
+      tag: ${{ steps.source.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: refs/tags/${{ inputs.tag || github.ref_name }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Validate tag and version
+        id: source
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          python scripts/release.py --validate-only --tag "$RELEASE_TAG"
+          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: validate
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: ${{ needs.validate.outputs.commit }}
+      tag: ${{ needs.validate.outputs.tag }}
+
+  desktop:
+    needs: validate
+    uses: ./.github/workflows/desktop.yml
+    with:
+      ref: ${{ needs.validate.outputs.commit }}
+      tag: ${{ needs.validate.outputs.tag }}
+    secrets:
+      LINKPORT_UPDATE_PUBLIC_KEY: ${{ secrets.LINKPORT_UPDATE_PUBLIC_KEY }}
+
+  draft:
+    needs: [validate, build, desktop]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.validate.outputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: linkport-*
+          path: dist
+          merge-multiple: true
+      - name: Validate six archives and create checksums
+        env:
+          RELEASE_TAG: ${{ needs.validate.outputs.tag }}
+        run: |
+          python scripts/release.py --checksums-only --require-all --tag "$RELEASE_TAG"
+          (cd dist && sha256sum --check checksums.txt)
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*
+          path: dist/desktop
+          merge-multiple: true
+      - name: Verify desktop archives and sign updates
+        env:
+          LINKPORT_UPDATE_PRIVATE_KEY: ${{ secrets.LINKPORT_UPDATE_PRIVATE_KEY }}
+          LINKPORT_UPDATE_PUBLIC_KEY: ${{ secrets.LINKPORT_UPDATE_PUBLIC_KEY }}
+        run: |
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+          import sys
+          sys.path.insert(0, "scripts")
+          import release
+          version = release.read_version()
+          names = {f"linkport-desktop_{version}_{os}_{arch}.zip" for os, arch in release.TARGETS}
+          actual = {p.name for p in Path("dist/desktop").glob("*.zip")}
+          if actual != names:
+              raise SystemExit(f"desktop archive mismatch: {actual ^ names}")
+          lines = [f"{hashlib.sha256((Path('dist/desktop') / name).read_bytes()).hexdigest()}  {name}\n" for name in sorted(names)]
+          Path("dist/desktop/desktop-checksums.txt").write_text("".join(lines), encoding="utf-8")
+          PY
+          if [[ -n "$LINKPORT_UPDATE_PRIVATE_KEY" || -n "$LINKPORT_UPDATE_PUBLIC_KEY" ]]; then
+            test -n "$LINKPORT_UPDATE_PRIVATE_KEY"
+            test -n "$LINKPORT_UPDATE_PUBLIC_KEY"
+            go run ./tools/update-sign -sign-dir dist/desktop
+          fi
+      - name: Create draft preview with all assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ needs.validate.outputs.tag }}
+        run: |
+          gh release create "$RELEASE_TAG" \
+            dist/*.tar.gz dist/*.zip dist/checksums.txt dist/desktop/*.zip dist/desktop/desktop-checksums.txt \
+            --verify-tag --draft --prerelease \
+            --title "Linkport $RELEASE_TAG — desktop preview" \
+            --notes-file CHANGELOG.md
+          if compgen -G 'dist/desktop/*.sig' > /dev/null; then
+            gh release upload "$RELEASE_TAG" dist/desktop/*.sig
+          fi
