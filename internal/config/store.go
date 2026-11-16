@@ -63,7 +63,7 @@ func (store *FileStore) Load(ctx context.Context) (State, error) {
 	if err := ctx.Err(); err != nil {
 		return State{}, err
 	}
-	file, err := os.Open(store.path)
+	file, err := openConfigFile(store.path)
 	if errors.Is(err, os.ErrNotExist) {
 		return State{Version: Version, Shares: []Choice{}}, nil
 	}
