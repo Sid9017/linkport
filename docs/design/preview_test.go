@@ -22,11 +22,11 @@ func TestPreviewUsesHostPlatformAndOfflineAssets(t *testing.T) {
 	if strings.Contains(body, "https://unpkg") || strings.Contains(body, "data-platform>") {
 		t.Fatal("preview still depends on an external icon script or manual OS selection")
 	}
-	for _, asset := range []string{"Geist.woff2", "GeistMono.woff2"} {
+	for _, asset := range []string{"SpaceGrotesk.ttf", "IBMPlexMono.ttf"} {
 		response := httptest.NewRecorder()
 		handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/assets/fonts/"+asset, nil))
-		if response.Code != http.StatusOK || !strings.HasPrefix(response.Body.String(), "wOF2") {
-			t.Fatalf("%s is not a bundled WOFF2 font: %d", asset, response.Code)
+		if response.Code != http.StatusOK || !strings.HasPrefix(response.Body.String(), "\x00\x01\x00\x00") {
+			t.Fatalf("%s is not a bundled TrueType font: %d", asset, response.Code)
 		}
 	}
 }

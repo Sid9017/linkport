@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#f7f7f5">
+  <meta name="description" content="把远端串口，接到你的本机工具里。Linkport 通过设备配对与显式共享，在自己的机器之间建立加密的串口连接，无需注册账号，也无需另装 VPN。">
+  <meta property="og:title" content="Linkport — 串口在远端，工作在这里。">
+  <meta property="og:description" content="配对自己的机器，共享选中的串口，继续使用熟悉的本机工具。了解 Linkport 如何通过 iroh 建立直接、加密的连接。">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://linkport.oddavocet4.chatgpt.site">
+  <title>Linkport — 串口在远端，工作在这里。</title>
+  <link rel="icon" type="image/svg+xml" href="assets/linkport.svg">
+  <link rel="preload" href="assets/SpaceGrotesk.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="style.css">
+  <script src="assets/vendor/gsap.min.js" defer></script>
+  <script src="assets/vendor/ScrollTrigger.min.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到主要内容</a>
+  <svg class="icon-library" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M6 18 18 6M6 6h12v12"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="8" r="5"/><path d="m12 12 9 9m-3-3 3-3m-6 0 3-3"/></symbol>
+    <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="13" rx="2"/><path d="M8 21h8m-4-5v5"/></symbol>
+    <symbol id="i-port" viewBox="0 0 24 24"><path d="M5 5h14l2 4-2 10H5L3 9Z"/><path d="M7 9h.01M12 9h.01M17 9h.01M9 14h.01M15 14h.01" stroke-width="2.8"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  </svg>
+
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="#top" aria-label="Linkport 首页"><img src="assets/linkport.svg" alt="" width="32" height="32"><span>linkport</span></a>
+      <nav class="desktop-nav" aria-label="主要导航">
+        <a href="#experience">使用方式</a><a href="#network">连接原理</a><a href="#control">安全与控制</a><a href="#questions">常见问题</a>
+      </nav>
+      <a class="header-release" href="https://github.com/Sid9017/linkport/releases" target="_blank" rel="noopener noreferrer">GitHub Releases <svg class="icon"><use href="#i-external"/></svg></a>
+      <button class="menu-toggle" aria-label="打开导航" aria-expanded="false" aria-controls="mobile-nav"><span></span><span></span></button>
+    </div>
+    <nav id="mobile-nav" class="mobile-nav" aria-label="移动导航" hidden>
+      <a href="#experience">使用方式</a><a href="#network">连接原理</a><a href="#control">安全与控制</a><a href="#questions">常见问题</a>
+      <a href="https://github.com/Sid9017/linkport/releases" target="_blank" rel="noopener noreferrer">GitHub Releases ↗</a>
+    </nav>
+  </header>
+
+  <main id="main">
+    <section class="hero wrap" id="top">
+      <div class="hero-topline"><span class="tiny-label"><span class="status-dot"></span> 0.0.1 · 开发预览</span><span class="tiny-label hero-kicker">YOUR DEVICES. YOUR CONNECTION.</span></div>
+      <h1>串口在远端。<br>工作，<span class="heading-soft">在这里。</span></h1>
+      <p class="hero-intro">把已共享的远端串口，接到你的本机工具里。<br class="desktop-break">无需注册账号，也无需另装 VPN。</p>
+      <div class="hero-actions">
+        <a class="button button-dark" href="#experience">看看如何连接 <svg class="icon"><use href="#i-arrow"/></svg></a>
+        <a class="text-link" href="#network">了解背后的原理 <svg class="icon diagonal"><use href="#i-arrow"/></svg></a>
+      </div>
+
+      <figure class="hero-bridge" aria-labelledby="hero-diagram-caption">
+        <div class="bridge-label bridge-label-left">01 / 共享端</div>
+        <div class="bridge-label bridge-label-right">02 / 使用端</div>
+        <svg class="bridge-lines" viewBox="0 0 1120 270" fill="none" aria-hidden="true">
+          <path class="bridge-track" d="M210 112H350C405 112 405 174 460 174H660C715 174 715 112 770 112H910"/>
+          <path class="bridge-draw" d="M210 112H350C405 112 405 174 460 174H660C715 174 715 112 770 112H910" pathLength="1"/>
+          <circle cx="210" cy="112" r="4" fill="currentColor"/><circle cx="910" cy="112" r="4" fill="currentColor"/>
+        </svg>
+        <div class="bridge-endpoint endpoint-remote">
+          <svg class="port-art" viewBox="0 0 128 80" fill="none" aria-hidden="true">
+            <rect x="3" y="17" width="122" height="47" rx="10"/><path d="M28 29h72l-7 25H35Z"/>
+            <circle cx="15" cy="40" r="3"/><circle cx="113" cy="40" r="3"/>
+            <g fill="currentColor" stroke="none"><circle cx="42" cy="37" r="2.2"/><circle cx="53" cy="37" r="2.2"/><circle cx="64" cy="37" r="2.2"/><circle cx="75" cy="37" r="2.2"/><circle cx="86" cy="37" r="2.2"/><circle cx="47" cy="46" r="2.2"/><circle cx="58" cy="46" r="2.2"/><circle cx="69" cy="46" r="2.2"/><circle cx="80" cy="46" r="2.2"/></g>
+          </svg>
+          <strong>实验室里的串口</strong><span>只共享你选中的端口</span>
+        </div>
+        <div class="bridge-encryption"><svg class="icon"><use href="#i-lock"/></svg><span>设备间加密连接</span><small>DIRECT WHEN POSSIBLE</small></div>
+        <div class="bridge-endpoint endpoint-local">
+          <svg class="workstation-art" viewBox="0 0 128 80" fill="none" aria-hidden="true"><rect x="18" y="9" width="92" height="55" rx="5"/><path d="M9 71h110M55 64v7m18-7v7M30 23h26m-26 9h42m-42 9h17"/><path class="terminal-caret" d="m81 35 5 5-5 5m9 0h10"/></svg>
+          <strong>你熟悉的本机工具</strong><span>通过本机虚拟串口收发</span>
+        </div>
+        <figcaption id="hero-diagram-caption">物理串口在对方的机器上，工具与工作流留在你的机器上。</figcaption>
+      </figure>
+      <div class="hero-footnote"><span>为开发、调试和自己的设备而做。</span><span>macOS <b>·</b> Windows <b>·</b> Linux</span></div>
+    </section>
+
+    <section class="section experience-section" id="experience">
+      <div class="wrap">
+        <div class="section-heading">
+          <div><p class="eyebrow">01 / A SHORTER WAY TO YOUR HARDWARE</p><h2>距离变了。<br>顺手的工具，不用变。</h2></div>
+          <p class="section-intro">设备放在实验室、工作台或另一间房里。<br>通过 Linkport 配对、共享、映射，<br>把它接回你正在使用的工具。</p>
+        </div>
+        <div class="walkthrough">
+          <div class="step-tabs" role="tablist" aria-label="连接的三个步骤">
+            <button id="step-tab-0" class="step-tab is-active" role="tab" aria-selected="true" aria-controls="step-panel-0" data-step="0"><span>01</span>配对机器<svg class="icon"><use href="#i-arrow"/></svg></button>
+            <button id="step-tab-1" class="step-tab" role="tab" aria-selected="false" aria-controls="step-panel-1" tabindex="-1" data-step="1"><span>02</span>选择串口<svg class="icon"><use href="#i-arrow"/></svg></button>
+            <button id="step-tab-2" class="step-tab" role="tab" aria-selected="false" aria-controls="step-panel-2" tabindex="-1" data-step="2"><span>03</span>连接工具<svg class="icon"><use href="#i-arrow"/></svg></button>
+          </div>
+          <div class="walkthrough-body">
+            <div class="walkthrough-copy" aria-live="polite">
+              <span class="step-counter" id="step-counter">01—03</span>
+              <h3 id="step-title">先让两台机器，<br>认出彼此。</h3>
+              <p id="step-description">在一台机器生成邀请，在另一台复制导入。双方记住对方的设备公钥，建立属于自己的信任关系。</p>
+              <p class="step-note" id="step-note">邀请 5 分钟内有效，仅能使用一次。配对完成后，还需要单独选择共享的串口。</p>
+              <button class="text-link step-next" id="step-next">下一步：选择串口 <svg class="icon"><use href="#i-arrow"/></svg></button>
+            </div>
+            <div class="product-window">
+              <div class="window-bar"><div class="window-dots" aria-hidden="true"><i></i><i></i><i></i></div><span>Linkport</span><span class="demo-label">交互演示</span></div>
+              <div id="step-panel-0" class="step-panel pairing-panel" role="tabpanel" aria-labelledby="step-tab-0">
+                <div class="pair-device"><div class="device-symbol"><svg class="icon"><use href="#i-monitor"/></svg></div><strong>这台机器</strong><span class="mono">DEVICE A</span></div>
+                <div class="invite-connection"><span class="pair-line"></span><div class="invite-card"><svg class="icon"><use href="#i-key"/></svg><strong>一次性邀请</strong><span>5 分钟内有效</span></div><span class="pair-line"></span></div>
+                <div class="pair-device"><div class="device-symbol"><svg class="icon"><use href="#i-monitor"/></svg></div><strong>另一台机器</strong><span class="mono">DEVICE B</span></div>
+                <p class="panel-caption"><svg class="icon"><use href="#i-lock"/></svg>交换公钥，私钥各自保管。</p>
+              </div>
+              <div id="step-panel-1" class="step-panel sharing-panel" role="tabpanel" aria-labelledby="step-tab-1" hidden>
+                <div class="panel-heading"><span>本机串口</span><span class="muted" id="shared-count">1 个已共享</span></div>
+                <label class="port-row"><svg class="icon port-row-icon"><use href="#i-port"/></svg><span class="port-details"><strong>USB Serial</strong><span class="mono">/dev/ttyUSB0</span></span><span class="share-status" id="share-status">共享中</span><span class="switch"><input type="checkbox" id="demo-share" checked aria-label="在演示中共享 USB Serial"><span class="switch-track"></span></span></label>
+                <div class="port-row unshared-port"><svg class="icon port-row-icon"><use href="#i-port"/></svg><span class="port-details"><strong>调试串口</strong><span class="mono">/dev/ttyUSB1</span></span><span class="muted">未共享</span><span class="port-unshared-mark" aria-hidden="true">—</span></div>
+                <p class="sharing-feedback" id="sharing-feedback">只有选中的串口，会出现在已配对机器上。试着切换共享，再看下一步。</p>
+              </div>
+              <div id="step-panel-2" class="step-panel mapping-panel" role="tabpanel" aria-labelledby="step-tab-2" hidden>
+                <div id="mapping-available">
+                  <div class="mapping-route"><div><span class="muted">远端物理串口</span><strong class="mono">/dev/ttyUSB0</strong></div><svg class="icon"><use href="#i-arrow"/></svg><div><span class="muted">本机虚拟串口</span><strong class="mono">/dev/ttys007</strong></div></div>
+                  <div class="mini-terminal"><div class="terminal-title"><span>你的串口工具</span><span class="mono">RX / TX</span></div><p><span>TX →</span> 发出调试指令</p><p><span>RX ←</span> 读取远端响应</p><span class="terminal-cursor" aria-hidden="true"></span></div>
+                  <p class="mapping-caption">连接建立后，在自己的工具中打开映射路径。</p>
+                </div>
+                <div id="mapping-unavailable" class="mapping-empty" hidden><svg class="icon"><use href="#i-port"/></svg><h4>还没有开放的串口</h4><p>配对不等于共享。先在共享端选择一个端口，才能建立本机映射。</p><button class="text-link" id="back-to-sharing">返回选择串口 <svg class="icon"><use href="#i-arrow"/></svg></button></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="experience-footer"><span><svg class="icon"><use href="#i-check"/></svg> 也可直接在 Linkport 中监听、发送和导出日志。</span><span class="muted">一个物理串口，同一时间由一个会话使用。</span></div>
+        <div class="feature-lines">
+          <div><span class="feature-index">A</span><h3>多条连接，各自独立。</h3><p>为不同的串口建立独立映射。切换监听、关闭一条连接，其余会话继续工作。</p></div>
+          <div><span class="feature-index">B</span><h3>数据来去，看得清楚。</h3><p>分开查看 RX 与 TX，支持文本、HEX、暂停显示和导出。日志在本机有界留存。</p></div>
+          <div><span class="feature-index">C</span><h3>只看本机，也很顺手。</h3><p>直接监听本机串口，无需先配对或共享。选中端口和波特率，就能开始调试。</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="network-section section" id="network">
+      <div class="wrap">
+        <div class="section-heading network-heading"><div><p class="eyebrow">02 / THE SHORTEST AVAILABLE PATH</p><h2>能直接连接，<br>就少绕一点路。</h2></div><div><p class="section-intro">iroh 帮助设备找到彼此，尝试建立直连。<br>网络不允许时，中继接力，转发密文。<br>串口内容始终在两台设备间加密传输。</p><a class="text-link on-dark" href="https://www.iroh.computer/" target="_blank" rel="noopener noreferrer">认识 iroh <svg class="icon"><use href="#i-external"/></svg></a></div></div>
+        <div class="network-demo" data-mode="direct">
+          <div class="network-toolbar"><span class="tiny-label">两种路径，同一对设备。</span><div class="path-tabs" role="group" aria-label="切换查看连接路径"><span class="path-slider" aria-hidden="true"></span><button class="is-active" data-mode="direct" aria-pressed="true">优先直连</button><button data-mode="relay" aria-pressed="false">中继兜底</button></div></div>
+          <div class="network-canvas">
+            <svg class="network-graph network-graph-desktop" viewBox="0 0 1100 400" fill="none" role="img" aria-labelledby="network-graph-title network-graph-description">
+              <title id="network-graph-title">共享端与使用端之间的两条加密路径</title>
+              <desc id="network-graph-description">优先直接连接，受限时经由中继转发密文；身份和串口授权由两台设备自己管理。</desc>
+              <path class="net-route direct-route" d="M244 174C407 48 693 48 856 174" pathLength="1"/>
+              <path class="net-route relay-route" d="M244 216C357 316 397 322 504 322M596 322C703 322 743 316 856 216" pathLength="1"/>
+              <g class="net-peer peer-a"><rect x="65" y="136" width="180" height="122" rx="10"/><rect x="132" y="158" width="46" height="29" rx="3"/><path d="M144 197h22m-11-10v10"/><text x="155" y="222" text-anchor="middle">共享端</text><text class="net-micro" x="155" y="242" text-anchor="middle">物理串口 · 本机授权</text></g>
+              <g class="net-peer peer-b"><rect x="855" y="136" width="180" height="122" rx="10"/><rect x="922" y="158" width="46" height="29" rx="3"/><path d="M934 197h22m-11-10v10"/><text x="945" y="222" text-anchor="middle">使用端</text><text class="net-micro" x="945" y="242" text-anchor="middle">虚拟串口 · 本机工具</text></g>
+              <g class="direct-route-label"><rect x="454" y="65" width="192" height="32" rx="16"/><text x="550" y="86" text-anchor="middle">设备直连 · 端到端加密</text></g>
+              <g class="relay-node"><rect x="504" y="282" width="92" height="80" rx="12"/><path d="M532 305h36v12h-36zm0 18h36v12h-36z"/><circle cx="560" cy="311" r="1.4"/><circle cx="560" cy="329" r="1.4"/><text x="550" y="387" text-anchor="middle">中继服务</text></g>
+              <text class="relay-state" id="relay-state" x="550" y="259" text-anchor="middle">随时可以接力的备用路径</text>
+              <g class="direct-obstructed"><path d="m541 120 18 18m0-18-18 18"/><text x="550" y="162" text-anchor="middle">网络限制，无法直连</text></g>
+            </svg>
+            <svg class="network-graph network-graph-mobile" viewBox="0 0 350 420" fill="none" role="img" aria-label="共享端和使用端之间的直连或中继路径" aria-describedby="path-description">
+              <path class="net-route direct-route" d="M100 53H65C39 53 30 65 30 92V319C30 347 39 360 65 360H100"/>
+              <path class="net-route relay-route" d="M250 53H276C303 53 317 67 317 95V171M317 239V318C317 346 303 360 276 360H250"/>
+              <g class="net-peer"><rect x="100" y="8" width="150" height="90" rx="8"/><text x="175" y="44" text-anchor="middle">共享端</text><text class="net-micro" x="175" y="70" text-anchor="middle">物理串口 · 本机授权</text></g>
+              <g class="net-peer"><rect x="100" y="315" width="150" height="90" rx="8"/><text x="175" y="352" text-anchor="middle">使用端</text><text class="net-micro" x="175" y="378" text-anchor="middle">虚拟串口 · 本机工具</text></g>
+              <g class="direct-route-label"><rect x="5" y="179" width="84" height="46" rx="4"/><text x="47" y="198" text-anchor="middle">设备直连</text><text x="47" y="217" text-anchor="middle">端到端加密</text></g>
+              <g class="relay-node"><rect x="281" y="171" width="68" height="68" rx="8"/><path d="M297 189h36v10h-36zm0 16h36v10h-36z"/><text x="315" y="261" text-anchor="middle">中继服务</text></g>
+              <g class="direct-obstructed"><rect x="1" y="179" width="93" height="46" rx="4" fill="#181818"/><path d="m22 184 12 12m0-12-12 12"/><text x="47" y="219" text-anchor="middle">直连受限</text></g>
+              <text class="mobile-route-note" x="175" y="143" text-anchor="middle">同一对设备</text>
+              <text class="mobile-route-note" x="175" y="285" text-anchor="middle">两种可用路径</text>
+            </svg>
+          </div>
+          <div class="network-description" aria-live="polite"><span class="path-indicator" aria-hidden="true"></span><p id="path-description">直连时，串口数据直接在两台设备之间传输，中继不转发这条数据。</p><span class="mono" id="path-caption">DEVICE ↔ DEVICE</span></div>
+        </div>
+        <div class="responsibilities">
+          <div><span class="responsibility-number">01</span><h3>设备，做决定。</h3><p>本地保存身份和信任名单，管理串口清单、共享权限和正在进行的会话。</p></div>
+          <div><span class="responsibility-number">02</span><h3>发现服务，帮忙找。</h3><p>提供连接地址线索，帮助定位对端。发现到设备，不代表已经获得访问许可。</p></div>
+          <div><span class="responsibility-number">03</span><h3>中继，帮忙送。</h3><p>协助连接，需要时转发密文。它不管理串口权限，也不负责保存串口日志。</p></div>
+        </div>
+        <details class="connection-details"><summary>一次连接，是怎样发生的？<svg class="icon"><use href="#i-plus"/></svg></summary><ol class="connection-sequence"><li><span>1</span><div><strong>使用端发起连接</strong><p>用已配对设备的公钥和联系方式寻找对端。</p></div></li><li><span>2</span><div><strong>两端共同尝试打洞</strong><p>客户端网络栈交换路径线索、发送探测，尝试穿过 NAT。中继帮助双方接上联系。</p></div></li><li><span>3</span><div><strong>选择可用路径</strong><p>能直连时直接传输，受限时经中继转发。具体结果取决于双方网络。</p></div></li><li><span>4</span><div><strong>验证信任，再打开串口</strong><p>共享端检查设备授权、端口共享状态和占用情况，通过后才建立数据流。</p></div></li></ol></details>
+      </div>
+    </section>
+
+    <section class="section control-section" id="control">
+      <div class="wrap">
+        <p class="eyebrow">03 / TRUST STAYS WITH YOU</p>
+        <div class="control-heading"><h2>管理自己的机器，<br>从掌握自己的身份开始。</h2><p class="section-intro">不用中心账号来认出你。<br>每台机器独立生成密钥，<br>通过配对建立彼此的信任。</p></div>
+        <div class="control-layout">
+          <figure class="identity-figure" aria-labelledby="identity-caption">
+            <div class="identity-orbit orbit-one"></div><div class="identity-orbit orbit-two"></div>
+            <div class="identity-core"><svg class="icon"><use href="#i-key"/></svg><span>设备身份</span><span class="mono">Ed25519</span></div>
+            <div class="identity-tag tag-private"><svg class="icon"><use href="#i-lock"/></svg>私钥留在本机</div><div class="identity-tag tag-public">公钥用于配对 <svg class="icon"><use href="#i-arrow"/></svg></div>
+            <figcaption id="identity-caption">身份由设备持有，信任由你建立。</figcaption>
+          </figure>
+          <div class="control-principles">
+            <div><span>01</span><div><h3>配对，确认连接谁。</h3><p>知道设备 ID 还不够。对方需要通过有效邀请，进入本机的信任名单。</p></div></div>
+            <div><span>02</span><div><h3>共享，决定开放什么。</h3><p>只开放手动选中的串口。配对不会自动共享，新插入的设备也不会自动开放。</p></div></div>
+            <div><span>03</span><div><h3>移除，收回本机授权。</h3><p>移除已配对设备会关闭它与本机的连接和会话。其他机器上的信任名单各自管理。</p></div></div>
+          </div>
+        </div>
+        <div class="privacy-boundary"><svg class="icon"><use href="#i-lock"/></svg><div><h3>内容加密，边界说清。</h3><p>中继无法解密正常连接中的串口内容，但仍可观察 IP、连接时间和转发量等元数据。当前设备私钥保存在本机受限配置文件中，尚未接入系统钥匙串。</p></div></div>
+      </div>
+    </section>
+
+    <section class="ownership-section section">
+      <div class="wrap">
+        <div class="ownership-top"><p class="eyebrow">LESS DEPENDENCE. MORE OWNERSHIP.</p><span class="tiny-label">基础设施，可以选择。</span></div>
+        <h2 class="ownership-statement"><span>你决定连接谁。</span><br><span>也决定，</span><span>共享什么。</span></h2>
+        <div class="ownership-bottom"><p>可以使用公共连接服务，也可以配置自己的发现服务和中继。<br>在可直接互通的网络中，还可以选择仅直连。</p><p class="ownership-note">“去中心化”在这里意味着：身份、信任和串口权限由设备掌握。<br>跨网络连接仍可能需要发现或中继基础设施。</p></div>
+      </div>
+    </section>
+
+    <section class="section faq-section" id="questions">
+      <div class="wrap faq-layout">
+        <div class="faq-heading"><p class="eyebrow">04 / A FEW THINGS TO KNOW</p><h2>再多了解一点。</h2><p>连接的方式很简单。<br>实际使用的边界，也值得说清。</p><span class="version-note"><span class="status-dot"></span> 0.0.1 开发预览</span></div>
+        <div class="faq-list">
+          <details><summary>一定要自己部署中继吗？<svg class="icon"><use href="#i-plus"/></svg></summary><p>不需要。客户端可以使用公共服务，也支持配置自己的服务。直连建立后，中继不必承载这条连接的数据；当网络限制使直连不可用时，中继才负责转发。公共服务的可用性与限额由其运营方决定。</p></details>
+          <details><summary>设备状态都保存在服务器上吗？<svg class="icon"><use href="#i-plus"/></svg></summary><p>设备身份、配对名单、串口清单、共享设置和日志由客户端本机管理。发现服务处理连接地址线索，中继维护转发所需的连接状态。它们不需要保存一份完整的设备业务状态，也不能替你打开串口共享。</p></details>
+          <details><summary>现有的串口工具可以继续用吗？<svg class="icon"><use href="#i-plus"/></svg></summary><p>Linkport 在使用端提供本机虚拟串口。macOS 和 Linux 使用 PTY；Windows 的远端映射需要用户预先安装兼容的 com0com 驱动并配置端口对。PTY 不传递真实 DTR/RTS，当前也不支持硬件流控或持续 BREAK。具体工具与硬件仍需在目标环境中验证。</p></details>
+          <details><summary>连接断开后，会自动恢复吗？<svg class="icon"><use href="#i-plus"/></svg></summary><p>底层网络具有路径选择能力，但已经断开的串口数据会话，当前需要手动重新连接。网络配置变更会暂停原有网络，重启连接后生效；独立的本机监听不受这一步影响。</p></details>
+          <details><summary>日志会上传或无限保存吗？<svg class="icon"><use href="#i-plus"/></svg></summary><p>当前没有云端日志。每条会话在本机保留最多 500 条或 128 KiB 日志，达到边界后不保留无限历史；可以导出当时仍在缓冲中的记录。暂停显示只冻结画面，不停止底层采集。</p></details>
+          <details><summary>丢失密钥或重置身份，会怎样？<svg class="icon"><use href="#i-plus"/></svg></summary><p>项目没有中心账号找回。重置会生成新的本机身份、清空本机配对并暂停网络，之后需要重新配对。它不会远程撤销旧密钥在其他机器上的授权；旧条目需要在各对端清理。</p></details>
+          <details><summary>这个网站会参与设备连接吗？<svg class="icon"><use href="#i-plus"/></svg></summary><p>不会。官网只介绍项目，不保存设备密钥、不发放配对授权，也不处于串口数据路径中。官网不可用不会直接中断正在进行的串口会话。发现服务、中继和 GitHub 软件发布是分别独立的服务边界。</p></details>
+        </div>
+      </div>
+    </section>
+
+    <section class="closing-section wrap">
+      <div><p class="eyebrow">FAR APART. WELL CONNECTED.</p><h2>让工具跟着你。<br>让连接，找到设备。</h2></div>
+      <a class="button button-dark" href="https://github.com/Sid9017/linkport/releases" target="_blank" rel="noopener noreferrer">关注 GitHub Releases <svg class="icon"><use href="#i-external"/></svg></a>
+    </section>
+  </main>
+  <footer class="site-footer">
+    <div class="wrap"><div class="footer-top"><a class="brand" href="#top"><img src="assets/linkport.svg" width="28" height="28" alt=""><span>linkport</span></a><span>从你的设备，到你的设备。</span><a class="text-link" href="#top">回到顶部 ↑</a></div><div class="footer-wordmark" aria-hidden="true">linkport<span>↔</span></div><div class="footer-bottom"><span>© 2026 Linkport · 开发预览</span><span>设备配对 · 显式共享 · 加密连接</span><a href="https://www.iroh.computer/" target="_blank" rel="noopener noreferrer">Connected with iroh ↗</a></div></div>
+  </footer>
+</body>
+</html>

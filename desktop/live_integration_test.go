@@ -14,7 +14,6 @@ import (
 	"github.com/Sid9017/linkport/docs/design"
 	"github.com/Sid9017/linkport/internal/engine"
 	"github.com/Sid9017/linkport/internal/serialport"
-	"github.com/Sid9017/linkport/internal/tailnet"
 )
 
 func TestNativeStateReportsActualEnumerationWithoutDemoSessions(t *testing.T) {
@@ -26,7 +25,6 @@ func TestNativeStateReportsActualEnumerationWithoutDemoSessions(t *testing.T) {
 		Enumerator: serialport.EnumerateFunc(func(context.Context) ([]serialport.Port, error) {
 			return []serialport.Port{{Path: "/dev/test-enumeration-only"}}, nil
 		}),
-		Tailnet: &tailnet.Client{Binary: func() (string, error) { return "", os.ErrNotExist }},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -50,7 +48,7 @@ func TestNativeStateReportsActualEnumerationWithoutDemoSessions(t *testing.T) {
 		t.Fatal(err)
 	}
 	if response.Code != http.StatusOK || len(state.LocalPorts) != 1 || state.LocalPorts[0].Path != "/dev/test-enumeration-only" ||
-		len(state.Sessions) != 0 || len(state.Devices) != 0 || state.Tailscale.State != "NotInstalled" {
+		len(state.Sessions) != 0 || len(state.Devices) != 0 || state.Network.State != "Disabled" {
 		t.Fatalf("native state is not backed by actual providers: %+v", state)
 	}
 }
@@ -69,7 +67,6 @@ func TestLiveDesktopBrowser(t *testing.T) {
 		options.Enumerator = serialport.EnumerateFunc(func(context.Context) ([]serialport.Port, error) {
 			return []serialport.Port{{Path: "/dev/frontend-fixture", Product: "Frontend fixture"}}, nil
 		})
-		options.Tailnet = &tailnet.Client{Binary: func() (string, error) { return "", os.ErrNotExist }}
 	}
 	live, err := engine.New(ctx, options)
 	if err != nil {
@@ -90,7 +87,6 @@ func TestLiveDesktopBrowser(t *testing.T) {
 	}
 	api := &nativeAPI{
 		ctx: ctx, token: "browser-test-only", engine: live, preferences: preferences,
-		tailscale: &tailscaleClient{ctx: ctx, source: func() tailnet.Status { return live.State().Tailscale }},
 	}
 	mux := http.NewServeMux()
 	mux.Handle("/native/v1/", api.handler())

@@ -26,19 +26,19 @@ sharing, persistence, peer identity, RFC 2217 framing and acknowledgements,
 session isolation, device removal and revocation. It also validates and
 packages the native CLI.
 
-The separate Unix virtual-port job runs `internal/vport`, `internal/session`
-and `internal/engine` with `-race`. These tests create actual operating-system
+The separate Unix virtual-port job runs `internal/vport`, `internal/session`,
+`internal/engine` and `internal/p2p` with `-race`. These tests create actual operating-system
 PTYs and isolated simulated physical endpoints. Coverage includes binary
 round trips, parameter forwarding, reopening, independent mappings, blocked
 operation cancellation, local monitoring and physical-port ownership.
-They do not require USB hardware or a live Tailscale account.
+They do not require USB hardware, an account or a public relay. The iroh suite uses real encrypted loopback endpoints to verify pairing, invitation expiry/replay, peer revocation and stream cancellation. The engine suite carries binary data through iroh and real PTYs, with physical modem outputs omitted for the simulated UART.
 
 ## Frontend coverage
 
 The checked-in browser suite is `scripts/ui/check.cjs`, with a pinned Playwright
 dependency and lockfile. CI invokes it through the desktop Go test harness
 using `LINKPORT_UI_FIXTURES=1`. That mode replaces machine enumeration and
-Tailscale discovery with isolated providers, and browser API fixtures drive
+public network discovery with isolated providers, and browser API fixtures drive
 connections without opening serial devices or signing into a network.
 
 The browser loads the real desktop HTML, live JavaScript and bundled Wails
@@ -50,7 +50,7 @@ pause/clear/export and viewport overflow/empty-state layout.
 These are browser interaction tests, not native WebView2/WKWebView automation.
 They verify that the runtime receives a drag request, not that the OS physically
 moves the native window. USB hardware, native dialogs, driver installation and
-real two-machine Tailscale access still need target-environment testing.
+real two-machine iroh access still need target-environment testing.
 
 Run locally after installing the desktop Go toolchain and native dependencies:
 

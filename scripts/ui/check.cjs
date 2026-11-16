@@ -54,7 +54,7 @@ async function checkFunctional(page, browserName) {
     const token = document.querySelector('meta[name="linkport-api-token"]').content;
     return (await fetch("/native/v1/state", { headers: { "X-Linkport-Token": token } })).json();
   });
-  assert.equal(initial.tailscale.state, "NotInstalled");
+  assert.equal(initial.network.state, "Disabled");
   assert.equal(initial.devices.length, 0);
   assert.equal(initial.sessions.length, 0);
   assert.equal(initial.localPorts.length, 1);
@@ -68,7 +68,7 @@ async function checkFunctional(page, browserName) {
     ports: [{ id: "fixture-port", path: "/dev/test-serial", product: "Test serial fixture", online: true }],
   };
   const fixture = {
-    tailscale: { state: "Running", installed: true, hostName: "local-test", ips: ["100.64.255.253"] },
+    network: { state: "Running", nodeID: "a".repeat(64), hostName: "local-test", config: { relayMode: "disabled", relayURLs: [] } },
     devices: [peer], localPorts: [{ id: "local-test", path: "/dev/local-fixture", product: "Local fixture", shared: false }],
     sharedPorts: [], sessions: [], refreshing: false,
   };
@@ -82,7 +82,8 @@ async function checkFunctional(page, browserName) {
     const body = route.request().method() === "GET" ? {} : JSON.parse(route.request().postData() || "{}");
     let response;
     if (operation === "state") response = fixture;
-    else if (operation === "tailscale") response = fixture.tailscale;
+    else if (operation === "network") response = fixture.network;
+    else if (operation === "devices") response = fixture.devices;
     else if (operation === "local") {
       assert.equal(body.path, "/dev/local-fixture");
       assert.equal(body.id, "local-test");
@@ -215,12 +216,12 @@ async function checkEmptyLayout(page, browserName) {
   await initializePage(page);
   await page.route("**/native/v1/state", route => route.fulfill({
     contentType: "application/json", body: JSON.stringify({
-      tailscale: { state: "Stopped", installed: true, hostName: "layout-test", ips: [] },
+      network: { state: "Running", nodeID: "b".repeat(64), hostName: "layout-test", config: { relayMode: "disabled", relayURLs: [] } },
       devices: [], localPorts: [], sharedPorts: [], sessions: [], refreshing: false,
     }),
   }));
-  await page.route("**/native/v1/tailscale", route => route.fulfill({
-    contentType: "application/json", body: '{"state":"Stopped","installed":true}',
+  await page.route("**/native/v1/network", route => route.fulfill({
+    contentType: "application/json", body: '{"state":"Running","nodeID":"layout-id","config":{"relayMode":"disabled","relayURLs":[]}}',
   }));
   await page.goto(origin, { waitUntil: "networkidle" });
   await page.waitForFunction(() => !document.querySelector("[data-connection-empty]").hidden);
@@ -230,7 +231,7 @@ async function checkEmptyLayout(page, browserName) {
       const empty = document.querySelector("[data-connection-empty]").getBoundingClientRect();
       const title = document.querySelector("[data-empty-title]").getBoundingClientRect();
       const copy = document.querySelector("[data-empty-copy]").getBoundingClientRect();
-      const button = document.querySelector("[data-live-login]").getBoundingClientRect();
+      const button = document.querySelector("[data-live-add]").getBoundingClientRect();
       return {
         centerDifference: Math.abs((title.top + button.bottom - empty.top - empty.bottom) / 2),
         horizontalDifference: Math.abs((button.left + button.right - empty.left - empty.right) / 2),
@@ -249,6 +250,94 @@ async function checkEmptyLayout(page, browserName) {
   await page.screenshot({ path: path.join(output, `${browserName}-empty.png`) });
 }
 
+async function checkDeviceManagement(page, browserName) {
+  const errors = [];
+  page.on("pageerror", error => errors.push(error.message));
+  await initializePage(page);
+  const id = "a".repeat(64);
+  const peer = { id: "b".repeat(64), hostName: "Paired test machine" };
+  const network = { state: "Running", nodeID: id, config: { relayMode: "disabled", relayURLs: [] } };
+  let peers = [];
+  let removed = false;
+  let reset = false;
+  await page.route("**/native/v1/network", async route => {
+    if (route.request().method() === "PUT") {
+      const cfg = route.request().postDataJSON();
+      assert.equal(cfg.relayMode, "disabled");
+      assert.deepEqual(cfg.relayURLs, []);
+      network.config = cfg;
+      network.restartRequired = true;
+    }
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify(network) });
+  });
+  await page.route("**/native/v1/devices/invite", route => route.fulfill({
+    contentType: "application/json",
+    body: JSON.stringify({ code: "linkport1.test-invitation", expiresAt: new Date(Date.now() + 300000).toISOString() }),
+  }));
+  await page.route("**/native/v1/devices", async route => {
+    const request = route.request();
+    if (request.method() === "POST") {
+      const { code } = request.postDataJSON();
+      if (code === "expired") {
+        await route.fulfill({ status: 409, body: "配对邀请已过期，请重新生成" });
+        return;
+      }
+      assert.equal(code, "linkport1.from-other-device");
+      peers = [peer];
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify(peer) });
+      return;
+    }
+    if (request.method() === "DELETE") {
+      assert.equal(request.postDataJSON().id, peer.id);
+      removed = true;
+      peers = [];
+    }
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify(peers) });
+  });
+  await page.route("**/native/v1/identity/reset", async route => {
+    const { confirmation } = route.request().postDataJSON();
+    if (confirmation !== id) {
+      await route.fulfill({ status: 409, body: "请使用完整的本机设备 ID 确认重置" });
+      return;
+    }
+    reset = true;
+    network.nodeID = "c".repeat(64);
+    await route.fulfill({ contentType: "application/json", body: JSON.stringify(network) });
+  });
+  await page.goto(origin, { waitUntil: "networkidle" });
+  await page.locator("[data-device-manager-open]").first().click();
+  await page.waitForFunction(() => document.querySelector("[data-device-id]").textContent.length === 64);
+  assert.equal(await page.locator("[data-device-id]").textContent(), id);
+  await page.locator("[data-invite-create]").click();
+  await page.waitForFunction(() => document.querySelector("[data-invitation]").value.startsWith("linkport1."));
+  assert.equal(await page.locator("[data-invitation]").inputValue(), "linkport1.test-invitation");
+  await page.locator("[data-pair-code]").fill("expired");
+  await page.locator("[data-pair-add]").click();
+  await page.waitForFunction(() => document.querySelector("[data-device-message]").textContent.includes("已过期"));
+  await page.locator("[data-pair-code]").fill("linkport1.from-other-device");
+  await page.locator("[data-pair-add]").click();
+  await page.locator("[data-device-remove]").waitFor();
+  assert.equal(await page.locator("[data-pair-code]").inputValue(), "");
+  await page.locator("[data-device-remove]").click();
+  await page.waitForFunction(() => document.querySelector("[data-paired-devices]").textContent.includes("尚未配对"));
+  assert.equal(removed, true);
+  await page.locator("[data-devices-dialog] summary").click();
+  await page.locator("[data-network-save]").click();
+  await page.waitForFunction(() => document.querySelector("[data-device-message]").textContent.includes("请重启"));
+  await page.locator("[data-reset-confirmation]").fill("wrong");
+  await page.locator("[data-identity-reset]").click();
+  await page.waitForFunction(() => document.querySelector("[data-device-message]").textContent.includes("完整"));
+  assert.equal(reset, false);
+  await page.locator("[data-reset-confirmation]").fill(id);
+  await page.locator("[data-identity-reset]").click();
+  await page.waitForFunction(() => document.querySelector("[data-device-id]").textContent.startsWith("cccc"));
+  assert.equal(reset, true);
+  await page.screenshot({ path: path.join(output, `${browserName}-devices.png`) });
+  await page.locator("[data-devices-close]").click();
+  await page.waitForFunction(() => document.querySelector("[data-invitation]").value === "");
+  assert.deepEqual(errors, []);
+}
+
 (async () => {
   const results = [];
   for (const browserName of browsers) {
@@ -265,6 +354,7 @@ async function checkEmptyLayout(page, browserName) {
       await context.tracing.start({ screenshots: true, snapshots: true });
       await checkFunctional(await context.newPage(), browserName);
       await checkEmptyLayout(await context.newPage(), browserName);
+      await checkDeviceManagement(await context.newPage(), browserName);
       results.push({ browser: browserName, platform, status: "passed", source: "isolated API fixtures and bundled Wails runtime" });
     } catch (error) {
       results.push({ browser: browserName, platform, status: "failed", error: error.stack || String(error) });

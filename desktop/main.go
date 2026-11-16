@@ -15,7 +15,6 @@ import (
 
 	"github.com/Sid9017/linkport/docs/design"
 	"github.com/Sid9017/linkport/internal/engine"
-	"github.com/Sid9017/linkport/internal/tailnet"
 	"github.com/Sid9017/linkport/internal/version"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/events"
@@ -51,11 +50,7 @@ func main() {
 		log.Fatal(err)
 	}
 	token := base64.RawURLEncoding.EncodeToString(tokenBytes)
-	live, err := engine.New(ctx, engine.Options{Directory: filepath.Join(directory, "linkport")})
-	if err != nil {
-		log.Fatal(err)
-	}
-	api := &nativeAPI{ctx: ctx, token: token, preferences: settings, engine: live}
+	api := &nativeAPI{ctx: ctx, token: token, preferences: settings}
 	handler := http.NewServeMux()
 	handler.Handle("/native/v1/", api.handler())
 	handler.Handle("/", design.DesktopHandlerWithToken(token))
@@ -68,7 +63,7 @@ func main() {
 	}
 	app := application.New(application.Options{
 		Name:        "Linkport",
-		Description: "Serial ports over your Tailscale network",
+		Description: "Private serial sharing between your paired devices",
 		Icon:        appIcon,
 		Assets: application.AssetOptions{
 			Handler:        handler,
@@ -85,11 +80,15 @@ func main() {
 			},
 		},
 	})
-	api.tailscale = &tailscaleClient{
-		ctx: ctx, openURL: app.Browser.OpenURL,
-		source:  func() tailnet.Status { return live.State().Tailscale },
-		changed: live.Refresh,
+	// Wails forwards a second launch to the existing instance in New. Acquire
+	// the device-store lock only after that check, so reopening still focuses
+	// the existing window instead of failing on its identity lock.
+	live, err := engine.New(ctx, engine.Options{Directory: filepath.Join(directory, "linkport")})
+	if err != nil {
+		log.Fatal(err)
 	}
+	defer live.Close()
+	api.engine = live
 	api.exportLog = func(identity string) (string, error) {
 		contents, err := live.Sessions().Export(identity)
 		if err != nil {
@@ -181,12 +180,11 @@ func main() {
 		window.ExecJS("document.querySelector('[data-settings-open]')?.click()")
 	})
 	rememberLabel(entry, "设置", "Settings")
-	entry = trayMenu.Add("登录 Tailscale").OnClick(func(*application.Context) {
-		if err := api.tailscale.beginLogin(); err != nil {
-			app.Logger.Error("Tailscale login", "error", err)
-		}
+	entry = trayMenu.Add("添加设备").OnClick(func(*application.Context) {
+		showWindow()
+		window.ExecJS("document.querySelector('[data-device-manager-open]')?.click()")
 	})
-	rememberLabel(entry, "登录 Tailscale", "Sign in to Tailscale")
+	rememberLabel(entry, "添加设备", "Add device")
 	entry = trayMenu.Add("检查更新").OnClick(func(*application.Context) {
 		showWindow()
 		window.ExecJS("document.querySelector('[data-settings-open]')?.click()")

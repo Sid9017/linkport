@@ -6,94 +6,75 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
-	"net/netip"
 	"os"
 	"path/filepath"
-	"sort"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/Sid9017/linkport/internal/api"
 	"github.com/Sid9017/linkport/internal/bridge"
 	"github.com/Sid9017/linkport/internal/config"
+	"github.com/Sid9017/linkport/internal/p2p"
 	"github.com/Sid9017/linkport/internal/rfc2217"
 	"github.com/Sid9017/linkport/internal/serialport"
 	"github.com/Sid9017/linkport/internal/session"
 	"github.com/Sid9017/linkport/internal/share"
-	"github.com/Sid9017/linkport/internal/tailnet"
 	"github.com/Sid9017/linkport/internal/version"
 	"github.com/Sid9017/linkport/internal/vport"
 	"go.bug.st/serial"
 )
 
-const ServicePort = 7700
-
-type Tailnet interface {
-	Status(context.Context) tailnet.Status
-	WhoIs(context.Context, string) (string, error)
-}
-
 type Device struct {
-	tailnet.Peer
-	Service string             `json:"service"`
-	Version string             `json:"version,omitempty"`
-	Bridge  bool               `json:"bridge"`
-	Ports   []share.SharedPort `json:"ports"`
-	Error   string             `json:"error,omitempty"`
-	address string
+	p2p.Peer
+	Online   bool               `json:"online"`
+	Service  string             `json:"service"`
+	Version  string             `json:"version,omitempty"`
+	Bridge   bool               `json:"bridge"`
+	Ports    []share.SharedPort `json:"ports"`
+	LastSeen time.Time          `json:"lastSeen,omitempty"`
+	Error    string             `json:"error,omitempty"`
 }
 
 type State struct {
-	Tailscale    tailnet.Status     `json:"tailscale"`
-	LocalPorts   []share.LocalPort  `json:"localPorts"`
-	SharedPorts  []share.SharedPort `json:"sharedPorts"`
-	Devices      []Device           `json:"devices"`
-	Sessions     []session.State    `json:"sessions"`
-	Refreshing   bool               `json:"refreshing"`
-	UpdatedAt    time.Time          `json:"updatedAt"`
-	LocalError   string             `json:"localError,omitempty"`
-	ServiceError string             `json:"serviceError,omitempty"`
-	Listening    []string           `json:"listening"`
+	Network     p2p.Status         `json:"network"`
+	LocalPorts  []share.LocalPort  `json:"localPorts"`
+	SharedPorts []share.SharedPort `json:"sharedPorts"`
+	Devices     []Device           `json:"devices"`
+	Sessions    []session.State    `json:"sessions"`
+	Refreshing  bool               `json:"refreshing"`
+	UpdatedAt   time.Time          `json:"updatedAt"`
+	LocalError  string             `json:"localError,omitempty"`
 }
 
 type Options struct {
 	Directory              string
 	DeviceDirectory        string
-	Tailnet                Tailnet
 	Enumerator             serialport.Enumerator
 	SharingConfig          string
 	DisableNetworkListener bool
+	LocalOnly              bool
 }
 
 type Engine struct {
-	ctx                    context.Context
-	tailnet                Tailnet
-	manager                *share.Manager
-	sessions               *session.Manager
-	mu                     sync.Mutex
-	state                  State
-	refresh                chan struct{}
-	client                 *http.Client
-	listeners              map[string]*http.Server
-	bridge                 *bridge.Server
-	broker                 *serialport.Broker
-	nodeID                 string
-	disableNetworkListener bool
+	ctx       context.Context
+	network   *p2p.Network
+	manager   *share.Manager
+	sessions  *session.Manager
+	mu        sync.Mutex
+	state     State
+	refresh   chan struct{}
+	bridge    *bridge.Server
+	broker    *serialport.Broker
+	closeOnce sync.Once
 }
 
 func New(ctx context.Context, options Options) (*Engine, error) {
-	if options.Tailnet == nil {
-		options.Tailnet = &tailnet.Client{}
+	if options.Directory == "" {
+		return nil, errors.New("configuration directory required")
 	}
 	if options.Enumerator == nil {
 		options.Enumerator = serialport.NewEnumerator()
-	}
-	if options.Directory == "" {
-		return nil, errors.New("configuration directory required")
 	}
 	if options.DeviceDirectory == "" {
 		homeDirectory, err := os.UserHomeDir()
@@ -109,34 +90,39 @@ func New(ctx context.Context, options Options) (*Engine, error) {
 	if err != nil {
 		return nil, err
 	}
-	engine := &Engine{
-		ctx: ctx, tailnet: options.Tailnet, manager: manager,
-		sessions: session.New(options.DeviceDirectory),
-		refresh:  make(chan struct{}, 1), listeners: make(map[string]*http.Server),
-		disableNetworkListener: options.DisableNetworkListener,
-		state:                  State{Devices: []Device{}, Listening: []string{}},
-		client: &http.Client{
-			Timeout: 2 * time.Second,
-			Transport: &http.Transport{
-				Proxy: nil, DialContext: (&net.Dialer{Timeout: time.Second, KeepAlive: 15 * time.Second}).DialContext,
-				MaxIdleConns: 32, MaxIdleConnsPerHost: 2, IdleConnTimeout: 30 * time.Second,
-				ResponseHeaderTimeout: 2 * time.Second, MaxResponseHeaderBytes: 16 * 1024,
-			},
-			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
-		},
+	network, err := p2p.New(ctx, p2p.Options{Directory: options.Directory, Disabled: options.DisableNetworkListener, LocalOnly: options.LocalOnly})
+	if err != nil {
+		return nil, err
 	}
-	engine.broker = serialport.NewBroker()
+	engine := &Engine{
+		ctx: ctx, network: network, manager: manager, sessions: session.New(options.DeviceDirectory),
+		refresh: make(chan struct{}, 1), broker: serialport.NewBroker(), state: State{Devices: []Device{}},
+	}
 	engine.bridge = engine.newBridge()
+	engine.sessions.Dial = func(ctx context.Context, nodeID, portID string, baud int) (*rfc2217.Stream, error) {
+		dialCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+		defer cancel()
+		conn, err := network.Dial(dialCtx, nodeID)
+		if err != nil {
+			return nil, err
+		}
+		return bridge.DialConn(dialCtx, conn, nodeID, portID, baud)
+	}
 	return engine, nil
 }
 
 func (engine *Engine) Run() {
 	ctx, cancel := context.WithCancel(engine.ctx)
 	defer cancel()
-	defer engine.client.CloseIdleConnections()
-	defer engine.broker.Close()
-	defer engine.closeNetwork()
-	defer engine.sessions.DisconnectAll(context.Canceled)
+	defer engine.Close()
+	handler, err := api.NewHandler(engine.manager, api.Options{
+		Name: engine.network.Status().HostName, NodeID: engine.network.Status().NodeID,
+		Version: version.Version, Bridge: engine.bridge, Auth: func(next http.Handler) http.Handler { return next },
+	})
+	if err != nil {
+		return
+	}
+	go engine.network.Serve(handler)
 	go engine.watchLocal(ctx)
 	for {
 		engine.update(ctx)
@@ -152,6 +138,17 @@ func (engine *Engine) Run() {
 	}
 }
 
+func (engine *Engine) Close() {
+	engine.closeOnce.Do(func() {
+		engine.network.Close()
+		engine.bridge.Close()
+		engine.sessions.DisconnectAll(context.Canceled)
+		engine.broker.Close()
+	})
+}
+
+func (engine *Engine) Network() *p2p.Network { return engine.network }
+
 func (engine *Engine) Refresh() {
 	select {
 	case engine.refresh <- struct{}{}:
@@ -163,8 +160,8 @@ func (engine *Engine) State() State {
 	engine.mu.Lock()
 	state := engine.state
 	state.Devices = append([]Device{}, state.Devices...)
-	state.Listening = append([]string{}, state.Listening...)
 	engine.mu.Unlock()
+	state.Network = engine.network.Status()
 	state.LocalPorts = engine.manager.LocalPorts()
 	state.SharedPorts = engine.manager.Snapshot().Ports
 	state.Sessions = engine.sessions.States()
@@ -217,11 +214,11 @@ func (engine *Engine) Connect(ctx context.Context, nodeID, portID string, baud i
 		return session.State{}, err
 	}
 	state := engine.State()
-	if state.Tailscale.Stale {
-		return session.State{}, errors.New("Tailscale 状态暂时无法确认，请稍后刷新")
+	if state.Network.State != "Running" {
+		return session.State{}, errors.New("iroh 网络未运行，请检查网络设置或重启 Linkport")
 	}
-	if state.Tailscale.State != "Running" {
-		return session.State{}, errors.New("请先登录并连接 Tailscale")
+	if !engine.network.Trusted(nodeID) {
+		return session.State{}, errors.New("请先添加并配对设备")
 	}
 	for _, device := range state.Devices {
 		if device.ID != nodeID {
@@ -243,12 +240,12 @@ func (engine *Engine) Connect(ctx context.Context, nodeID, portID string, baud i
 			}
 			return engine.sessions.Connect(engine.ctx, session.Target{
 				NodeID: device.ID, HostName: device.HostName, PortID: port.ID,
-				PortPath: port.Path, Label: label, Address: device.address, BaudRate: baud, VPort: virtual,
+				PortPath: port.Path, Label: label, Address: device.ID, BaudRate: baud, VPort: virtual,
 			})
 		}
 		return session.State{}, errors.New("对端已取消共享该串口")
 	}
-	return session.State{}, errors.New("Tailscale 设备不在当前可访问的目录中")
+	return session.State{}, errors.New("设备不在已配对目录中")
 }
 
 func (engine *Engine) MonitorLocal(ctx context.Context, identity, path string, baud int) (session.State, error) {
@@ -295,193 +292,72 @@ func validateBaud(baud int) error {
 func (engine *Engine) update(ctx context.Context) {
 	engine.mu.Lock()
 	engine.state.Refreshing = true
+	previous := make(map[string]time.Time)
+	for _, device := range engine.state.Devices {
+		previous[device.ID] = device.LastSeen
+	}
 	engine.mu.Unlock()
-	status := engine.tailnet.Status(ctx)
-	if status.State == "Unavailable" {
-		engine.mu.Lock()
-		previous := engine.state.Tailscale
-		engine.mu.Unlock()
-		if previous.State == "Running" {
-			previous.Stale, previous.Error = true, status.Error
-			status = previous
-		}
-	}
-	online := make(map[string]bool, len(status.Peers))
-	for _, peer := range status.Peers {
-		online[peer.ID] = peer.Online
-	}
-	for _, current := range engine.sessions.States() {
-		if current.Connected && !current.Local && !online[current.NodeID] {
-			engine.sessions.DisconnectWithReason(current.ID, errors.New("对端 Tailscale 设备已离线或不再可访问"))
-		}
-	}
-	if engine.nodeID != status.NodeID || status.State != "Running" {
-		engine.closeNetwork()
-		engine.sessions.DisconnectRemote(errors.New("Tailscale 网络已断开或账号已切换"))
-		engine.nodeID = status.NodeID
-		engine.bridge = engine.newBridge()
-	}
-	serviceError := ""
-	if status.State == "Running" {
-		if status.NodeID == "" {
-			serviceError = "无法读取本机 Tailscale 设备身份"
-		} else {
-			if !engine.disableNetworkListener {
-				serviceError = engine.bind(status)
-			}
-		}
-	}
-	devices := make([]Device, len(status.Peers))
+	peers := engine.network.Peers()
+	devices := make([]Device, len(peers))
 	probeCtx, cancel := context.WithTimeout(ctx, 8*time.Second)
 	defer cancel()
-	jobs := make(chan int)
 	var workers sync.WaitGroup
-	for worker := 0; worker < min(8, len(devices)); worker++ {
+	jobs := make(chan int)
+	for worker := 0; worker < min(8, len(peers)); worker++ {
 		workers.Add(1)
 		go func() {
 			defer workers.Done()
 			for index := range jobs {
-				devices[index] = engine.probe(probeCtx, status.Peers[index])
+				devices[index] = engine.probe(probeCtx, peers[index])
+				if !devices[index].Online {
+					devices[index].LastSeen = previous[peers[index].ID]
+				}
 			}
 		}()
 	}
-	for index, peer := range status.Peers {
-		devices[index] = Device{Peer: peer, Service: "unreachable", Ports: []share.SharedPort{}}
-	}
-	for index := range status.Peers {
-		jobs <- index
+	for i := range peers {
+		jobs <- i
 	}
 	close(jobs)
 	workers.Wait()
-	listening := make([]string, 0, len(engine.listeners))
-	for address := range engine.listeners {
-		listening = append(listening, address)
-	}
-	sort.Strings(listening)
 	engine.mu.Lock()
-	engine.state.Tailscale = status
 	engine.state.Devices = devices
-	engine.state.Refreshing = false
-	engine.state.ServiceError = serviceError
-	engine.state.Listening = listening
 	engine.state.UpdatedAt = time.Now()
+	engine.state.Refreshing = false
 	engine.mu.Unlock()
 }
 
-func (engine *Engine) closeNetwork() {
-	for address, server := range engine.listeners {
-		server.Close()
-		delete(engine.listeners, address)
-	}
-	if engine.bridge != nil {
-		engine.bridge.Close()
-	}
-}
-
-func (engine *Engine) bind(status tailnet.Status) string {
-	wanted := make(map[string]bool)
-	for _, raw := range status.IPs {
-		address, err := netip.ParseAddr(raw)
-		if err == nil && tailnet.IsAddress(address) {
-			wanted[net.JoinHostPort(address.String(), strconv.Itoa(ServicePort))] = true
-		}
-	}
-	for address, server := range engine.listeners {
-		if !wanted[address] {
-			server.Close()
-			delete(engine.listeners, address)
-		}
-	}
-	var failures []string
-	for address := range wanted {
-		if engine.listeners[address] != nil {
-			continue
-		}
-		listener, err := net.Listen("tcp", address)
-		if err != nil {
-			failures = append(failures, "无法监听 "+address+"："+err.Error())
-			continue
-		}
-		handler, err := api.NewHandler(engine.manager, api.Options{
-			Name: status.HostName, NodeID: status.NodeID, Version: version.Version,
-			Bridge: engine.bridge, Auth: engine.authenticate,
-		})
-		if err != nil {
-			listener.Close()
-			failures = append(failures, err.Error())
-			continue
-		}
-		server := &http.Server{
-			Handler: handler, ReadHeaderTimeout: 4 * time.Second, IdleTimeout: 30 * time.Second,
-			MaxHeaderBytes: 16 * 1024,
-		}
-		engine.listeners[address] = server
-		go server.Serve(listener)
-	}
-	return strings.Join(failures, "; ")
-}
-
-func (engine *Engine) authenticate(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		if request.Header.Get("Origin") != "" {
-			http.Error(writer, "browser origins are not accepted", http.StatusForbidden)
-			return
-		}
-		source, err := netip.ParseAddrPort(request.RemoteAddr)
-		if err != nil || !tailnet.IsAddress(source.Addr()) {
-			http.Error(writer, "Tailscale source address required", http.StatusForbidden)
-			return
-		}
-		if _, err := engine.tailnet.WhoIs(request.Context(), request.RemoteAddr); err != nil {
-			http.Error(writer, "Tailscale peer authentication required", http.StatusForbidden)
-			return
-		}
-		next.ServeHTTP(writer, request)
-	})
-}
-
-func (engine *Engine) probe(ctx context.Context, peer tailnet.Peer) Device {
-	device := Device{Peer: peer, Service: "offline", Ports: []share.SharedPort{}}
-	if !peer.Online {
+func (engine *Engine) probe(ctx context.Context, peer p2p.Peer) Device {
+	device := Device{Peer: peer, Service: "unreachable", Ports: []share.SharedPort{}}
+	client := engine.network.NewClient(peer.ID, 5*time.Second)
+	defer client.CloseIdleConnections()
+	var info api.Info
+	if err := getJSON(ctx, client, peer.ID, "/v1/info", &info); err != nil {
 		return device
 	}
-	device.Service = "unreachable"
-	for _, raw := range peer.IPs {
-		address, err := netip.ParseAddr(raw)
-		if err != nil || !tailnet.IsAddress(address) {
-			continue
-		}
-		endpoint := net.JoinHostPort(address.String(), strconv.Itoa(ServicePort))
-		var info api.Info
-		if err := engine.getJSON(ctx, endpoint, "/v1/info", &info); err != nil {
-			continue
-		}
-		if info.APIVersion != "v1" || info.NodeID != peer.ID {
-			device.Service = "incompatible"
-			continue
-		}
-		var snapshot share.Snapshot
-		if err := engine.getJSON(ctx, endpoint, "/v1/ports", &snapshot); err != nil {
-			continue
-		}
-		if len(snapshot.Ports) > 1024 {
-			device.Error = "对端串口清单过大"
-			continue
-		}
-		device.Service, device.Version, device.Bridge, device.address = "available", info.Version, info.RemoteDataBridge, endpoint
-		device.Ports = append([]share.SharedPort{}, snapshot.Ports...)
+	if info.APIVersion != "v1" || info.NodeID != peer.ID {
+		device.Service = "incompatible"
 		return device
 	}
+	var snapshot share.Snapshot
+	if err := getJSON(ctx, client, peer.ID, "/v1/ports", &snapshot); err != nil {
+		return device
+	}
+	if len(snapshot.Ports) > 1024 {
+		device.Error = "对端串口清单过大"
+		return device
+	}
+	device.Online, device.Service, device.Version, device.Bridge = true, "available", info.Version, info.RemoteDataBridge
+	device.Ports, device.LastSeen = append([]share.SharedPort{}, snapshot.Ports...), time.Now()
 	return device
 }
 
-func (engine *Engine) getJSON(ctx context.Context, endpoint, path string, target any) error {
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+endpoint+path, nil)
+func getJSON(ctx context.Context, client *http.Client, nodeID, path string, target any) error {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+nodeID+path, nil)
 	if err != nil {
 		return err
 	}
-	request.Header.Set("Accept", "application/json")
-	response, err := engine.client.Do(request)
+	response, err := client.Do(request)
 	if err != nil {
 		return err
 	}
@@ -496,5 +372,26 @@ func (engine *Engine) getJSON(ctx context.Context, endpoint, path string, target
 	if err := decoder.Decode(new(any)); !errors.Is(err, io.EOF) {
 		return errors.New("invalid Linkport response")
 	}
+	return nil
+}
+
+func (engine *Engine) AddDevice(ctx context.Context, code string) (p2p.Peer, error) {
+	peer, err := engine.network.AddDevice(ctx, code)
+	if err == nil {
+		engine.Refresh()
+	}
+	return peer, err
+}
+
+func (engine *Engine) RemoveDevice(id string) error {
+	if err := engine.network.RemoveDevice(id); err != nil {
+		return err
+	}
+	for _, state := range engine.sessions.States() {
+		if !state.Local && state.NodeID == id {
+			_ = engine.sessions.DisconnectWithReason(state.ID, errors.New("设备已移除，访问授权已撤销"))
+		}
+	}
+	engine.Refresh()
 	return nil
 }

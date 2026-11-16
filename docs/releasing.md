@@ -6,7 +6,7 @@ application or a production desktop release. The archives contain the
 font license. The design preview and font assets are embedded in the command
 and available with `linkport design`. Desktop designs and prototypes are review
 material. A separate Wails build now packages a native macOS `.app` and
-Windows/Linux desktop executables. Native desktops use real Tailscale/serial
+Windows/Linux desktop executables. Native desktops use real paired-device/serial
 providers and a real data bridge; only the separate design preview uses fixtures.
 Validate physical devices, two-machine networking, and platform drivers in the
 target environment before treating the development release as production-ready.

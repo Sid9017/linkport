@@ -26,17 +26,19 @@ does not represent a completed serial application or a production desktop app.
   desktop archives.
 - Adds a flat socket-and-cable graphic logo, grayscale themes, settings for text size,
   Chinese/English language, appearance and background updates.
-- Adds explicit Tailscale login actions in the UI and system tray. Browser
-  authorization uses the installed official CLI; there is no automatic login.
-- Replaces native desktop demo data with real Tailscale peer discovery, local
-  serial enumeration and persistent sharing controls. The separate design
-  preview keeps its illustrative fixtures.
-- Publishes an authenticated Tailscale-only sharing service on TCP 7700 and
-  adds `linkport serve --tailscale` for machines without the desktop shell.
+- Uses embedded iroh networking with persistent per-device identities, single-use
+  pairing invitations, trusted-device management, and immediate peer revocation.
+  No external VPN client or account login is required.
+- Supports public/custom relays and discovery, or direct-only networking; pauses
+  old transports immediately when network settings or identity are changed.
+- Runs authenticated sharing with `linkport serve`, and retains the loopback
+  development API through `linkport serve --local-api`.
+- Uses real paired-device discovery, local serial enumeration and persistent
+  sharing controls in the native desktop; the design preview keeps fixtures.
 - Adds RFC 2217 data transport, per-session PTY/com0com mappings, actual RX/TX
   records, serialized sends, and revocation on unshare or device removal.
 - Adds native full-buffer log export with byte-preserving HEX and escaped text.
-- Adds direct local serial monitoring without Tailscale or sharing, with the
+- Adds direct local serial monitoring without networking or sharing, with the
   same RX/TX, send, pause, HEX, clear, export and close actions. A physical-port
   broker arbitrates local monitoring against incoming remote sessions.
 - Fixes native title bar dragging by loading the Wails runtime explicitly and

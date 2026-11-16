@@ -64,6 +64,8 @@ func run(ctx context.Context, args []string, output, errorOutput io.Writer) erro
 		return serve(ctx, *listen, handler, output, "Desktop design preview (demo data)")
 	case "ports", "share", "unshare", "watch", "serve":
 		return runLocal(ctx, args, output, errorOutput)
+	case "identity", "devices", "invite", "pair", "forget", "network":
+		return runDevices(ctx, args, output, errorOutput)
 	default:
 		return fmt.Errorf("unknown command %q; run linkport help", args[0])
 	}
@@ -79,12 +81,21 @@ Usage:
   linkport share [--config FILE] ID_OR_PATH
   linkport unshare [--config FILE] ID_OR_PATH
   linkport watch [--config FILE]
-  linkport serve [--config FILE] [--listen 127.0.0.1:7700]
-  linkport serve --tailscale [--config FILE]
+  linkport serve [--config FILE]
+  linkport serve --local-api [--config FILE] [--listen 127.0.0.1:7700]
+  linkport identity [--directory DIR]
+  linkport devices [--directory DIR]
+  linkport invite [--directory DIR]
+  linkport pair [--directory DIR] INVITATION
+  linkport forget [--directory DIR] DEVICE_ID
+  linkport network [--directory DIR] [--relay-mode default|custom|disabled]
+                   [--relay-urls URL,URL] [--discovery-url URL]
 
 All ports start unshared. watch emits shared-port snapshots as JSON.
-serve exposes read-only snapshots and SSE on loopback for development.
-serve --tailscale shares selected ports on Tailscale IPs with peer authentication.
+serve runs authenticated iroh sharing for explicitly paired devices.
+invite prints a five-minute single-use invitation and stays online for pairing.
+identity --reset --confirm DEVICE_ID clears trusted devices and generates a new key.
+serve --local-api exposes read-only snapshots and SSE on loopback for development.
 The browser design preview uses demo data. The native Wails host uses real data.`)
 }
 
@@ -94,7 +105,7 @@ func runLocal(ctx context.Context, args []string, output, errorOutput io.Writer)
 	configPath := flags.String("config", "", "sharing choices JSON file (default: user config directory/linkport/shares.json)")
 	asJSON := flags.Bool("json", false, "print local ports as JSON")
 	listen := flags.String("listen", "127.0.0.1:7700", "loopback address for the read-only development API")
-	useTailscale := flags.Bool("tailscale", false, "publish real shared serial ports on Tailscale addresses, TCP 7700")
+	localAPI := flags.Bool("local-api", false, "serve the loopback read-only development API instead of iroh")
 	if err := flags.Parse(args[1:]); err != nil {
 		return err
 	}
@@ -109,15 +120,16 @@ func runLocal(ctx context.Context, args []string, output, errorOutput io.Writer)
 		}
 		*configPath = filepath.Join(directory, "linkport", "shares.json")
 	}
-	if *useTailscale {
-		if args[0] != "serve" || *listen != "127.0.0.1:7700" {
-			return errors.New("--tailscale is supported by serve and uses fixed Tailscale listeners on port 7700")
+	if args[0] == "serve" && !*localAPI {
+		if *listen != "127.0.0.1:7700" {
+			return errors.New("--listen requires --local-api; iroh manages its own network endpoint")
 		}
 		live, err := engine.New(ctx, engine.Options{Directory: filepath.Dir(*configPath), SharingConfig: *configPath})
 		if err != nil {
 			return err
 		}
-		fmt.Fprintln(output, "Linkport serial sharing: Tailscale IPs, TCP 7700; only explicitly shared ports")
+		fmt.Fprintln(output, "Linkport iroh device:", live.Network().Status().NodeID)
+		fmt.Fprintln(output, "Only paired devices can access explicitly shared ports; no account or VPN required.")
 		live.Run()
 		return ctx.Err()
 	}

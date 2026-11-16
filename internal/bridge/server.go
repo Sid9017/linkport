@@ -160,6 +160,12 @@ func Dial(ctx context.Context, address, identity string, baud int) (*rfc2217.Str
 	if err != nil {
 		return nil, err
 	}
+	return DialConn(ctx, conn, address, identity, baud)
+}
+
+// DialConn performs Linkport's RFC 2217 upgrade over an already authenticated
+// transport, including an iroh bidirectional stream.
+func DialConn(ctx context.Context, conn net.Conn, address, identity string, baud int) (*rfc2217.Stream, error) {
 	stream, err := upgrade(ctx, conn, address, identity, baud)
 	if err != nil {
 		conn.Close()

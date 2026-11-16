@@ -17,7 +17,6 @@ import (
 	"github.com/Sid9017/linkport/internal/api"
 	"github.com/Sid9017/linkport/internal/bridge"
 	"github.com/Sid9017/linkport/internal/serialport"
-	"github.com/Sid9017/linkport/internal/tailnet"
 	"github.com/creack/pty"
 )
 
@@ -35,7 +34,7 @@ func waitLocalState(t *testing.T, condition func() bool) {
 	}
 }
 
-func TestLocalMonitorUsesActualTTYWithoutTailscaleAndSharesPhysicalLock(t *testing.T) {
+func TestLocalMonitorWorksWithoutNetworkAndSharesPhysicalLock(t *testing.T) {
 	master, slave, err := pty.Open()
 	if err != nil {
 		t.Fatal(err)
@@ -47,7 +46,6 @@ func TestLocalMonitorUsesActualTTYWithoutTailscaleAndSharesPhysicalLock(t *testi
 	ctx, cancel := context.WithCancel(context.Background())
 	live, err := New(ctx, Options{
 		Directory: t.TempDir(), DeviceDirectory: t.TempDir(), DisableNetworkListener: true,
-		Tailnet: testTailnet{status: tailnet.Status{State: "NotInstalled"}},
 		Enumerator: serialport.EnumerateFunc(func(context.Context) ([]serialport.Port, error) {
 			if !present.Load() {
 				return []serialport.Port{}, nil
@@ -132,7 +130,7 @@ func TestLocalMonitorUsesActualTTYWithoutTailscaleAndSharesPhysicalLock(t *testi
 	if err := live.SetShared(ctx, port.ID, false); err != nil {
 		t.Fatal(err)
 	}
-	waitLocalState(t, func() bool { return live.State().Tailscale.State == "NotInstalled" })
+	waitLocalState(t, func() bool { return live.State().Network.State == "Disabled" })
 	states := live.sessions.States()
 	if len(states) != 1 || !states[0].Connected {
 		t.Fatal("network/share state closed independent local monitoring")
@@ -149,7 +147,7 @@ func TestLocalMonitorUsesActualTTYWithoutTailscaleAndSharesPhysicalLock(t *testi
 }
 
 func TestLocalMonitorRejectsPathOutsideEnumeratedInventory(t *testing.T) {
-	live := testEngine(t, testTailnet{})
+	live := testEngine(t)
 	defer live.broker.Close()
 	identity := serialport.Identity(serialport.Port{Path: "/dev/real-enumerated-port"})
 	if _, err := live.MonitorLocal(context.Background(), identity, "/etc/passwd", 9600); err == nil {

@@ -1,6 +1,6 @@
 <style>
-@font-face { font-family: "Linkport Sans"; src: url("/assets/fonts/Geist.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
-@font-face { font-family: "Linkport Mono"; src: url("/assets/fonts/GeistMono.woff2") format("woff2"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "Linkport Sans"; src: url("/assets/fonts/SpaceGrotesk.ttf") format("truetype"); font-style: normal; font-weight: 400; font-display: swap; }
+@font-face { font-family: "Linkport Mono"; src: url("/assets/fonts/IBMPlexMono.ttf") format("truetype"); font-style: normal; font-weight: 400; font-display: swap; }
 #linkport-review {
   --lp-bg: light-dark(#ffffff, #1b1b1b);
   --lp-soft: light-dark(#f5f5f5, #252525);
@@ -256,6 +256,14 @@
   #linkport-review button, #linkport-review .lp-switch, #linkport-review .lp-switch::after { transition: none; }
   #linkport-review .lp-settings[open] { animation: none; }
 }
+
+#linkport-review .lp-device-field { display: grid; gap: 8px; margin: 12px 0; }
+#linkport-review .lp-device-field textarea, #linkport-review .lp-device-field input { width: 100%; min-width: 0; padding: 8px; border: 1px solid var(--lp-line); border-radius: 5px; background: var(--lp-bg); color: var(--lp-text); font: inherit; resize: vertical; }
+#linkport-review [data-device-id] { display: block; overflow-wrap: anywhere; user-select: text; }
+#linkport-review [data-devices-dialog] .lp-inline { flex-wrap: wrap; }
+#linkport-review [data-devices-dialog] details { padding: 12px 0; }
+#linkport-review [data-devices-dialog] summary { cursor: pointer; }
+#linkport-review [data-devices-dialog] .lp-settings-status { overflow-wrap: anywhere; }
 </style>
 <div id="linkport-review">
   <svg class="lp-symbols" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs>
@@ -282,7 +290,7 @@
   <div class="lp-window" aria-label="Linkport 桌面设计预览，所有数据均为演示">
     <header class="lp-titlebar">
       <div class="lp-brand"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-logo"/></svg>Linkport <span class="lp-version">0.0.1</span></div>
-      <div class="lp-titletools"><span class="lp-caption lp-preview-label">演示数据</span><button type="button" class="lp-plain lp-netstate" data-tailscale-login aria-label="登录 Tailscale"><span class="lp-dot"></span><span data-network-state>Tailscale</span></button><button type="button" class="lp-iconbutton" data-settings-open aria-label="设置"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-settings"/></svg></button></div>
+      <div class="lp-titletools"><span class="lp-caption lp-preview-label">演示数据</span><button type="button" class="lp-plain lp-netstate" data-device-manager-open aria-label="设备与配对"><span class="lp-dot"></span><span data-network-state>iroh</span></button><button type="button" class="lp-iconbutton" data-settings-open aria-label="设置"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-settings"/></svg></button></div>
     </header>
     <main class="lp-layout">
       <nav class="lp-sidebar" aria-label="主导航">
@@ -317,7 +325,7 @@
               <button type="button" class="lp-machine" aria-expanded="true" aria-controls="lp-lab-ports" data-expand="lp-lab-ports">
                 <span class="lp-dot" style="color:var(--lp-accent)"></span><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-machine"/></svg>
                 <span class="lp-machine-name">lab-linux</span>
-                <code class="lp-machine-meta">100.101.20.4</code><span class="lp-right" data-lab-state>2 个共享串口</span>
+                <code class="lp-machine-meta">b284df83a109…</code><span class="lp-right" data-lab-state>2 个共享串口</span>
               </button>
               <div class="lp-porttree" id="lp-lab-ports">
                 <div class="lp-portrow" data-port="esp32" data-active="true">
@@ -352,7 +360,7 @@
         </div>
         <div class="lp-mapping-heading"><h2>本地映射</h2><span class="lp-caption" data-connection-count>1 条连接</span></div>
         <div data-mappings aria-live="polite"></div>
-        <div class="lp-connection-empty" data-connection-empty hidden><strong data-empty-title></strong><p data-empty-copy></p><button type="button" class="lp-primary" data-live-login hidden>登录 Tailscale</button></div>
+        <div class="lp-connection-empty" data-connection-empty hidden><strong data-empty-title></strong><p data-empty-copy></p><button type="button" class="lp-primary" data-live-add hidden>添加设备</button></div>
       </section>
       <section class="lp-workspace lp-monitor" aria-label="串口监听" data-screen="monitor" hidden>
         <div class="lp-sectionhead"><h2>监听</h2><div class="lp-monitor-selector"><select class="lp-session-select" data-session-select aria-label="监听会话"><option value="">暂无会话</option></select><button type="button" class="lp-iconbutton" data-local-monitor-open aria-label="监听本机串口" title="监听本机串口" hidden><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-port"/></svg></button></div></div>
@@ -398,9 +406,35 @@
       <label class="lp-setting"><span>后台检查并下载更新</span><input class="lp-switch" type="checkbox" role="switch" data-preference="autoUpdate" checked aria-label="后台检查并下载更新"></label>
       </div>
       <div class="lp-settings-section">
-        <div class="lp-setting"><div class="lp-setting-info"><span>Tailscale</span><span class="lp-settings-status" data-tail-status>桌面版中登录</span></div><button type="button" data-settings-login>登录 Tailscale</button></div>
+        <div class="lp-setting"><div class="lp-setting-info"><span>网络与设备</span><span class="lp-settings-status" data-network-status>无需账号，通过邀请配对</span></div><button type="button" data-device-manager-open>管理设备</button></div>
         <div class="lp-setting"><div class="lp-setting-info"><span>Linkport <code>0.0.1</code></span><span class="lp-settings-status" data-update-status>桌面版中检查更新</span></div><button type="button" class="lp-iconbutton" data-update-action aria-label="检查更新"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-refresh"/></svg></button></div>
       </div>
+    </div>
+  </dialog>
+  <dialog class="lp-settings" data-devices-dialog aria-labelledby="lp-devices-title">
+    <div class="lp-settings-head"><h2 id="lp-devices-title">设备与配对</h2><button type="button" class="lp-iconbutton" data-devices-close aria-label="关闭设备管理"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-close"/></svg></button></div>
+    <div class="lp-settings-body">
+      <div class="lp-settings-section"><span>本机设备 ID</span><code data-device-id>—</code><p class="lp-settings-status">身份密钥仅保存在本机。请通过邀请添加其他设备，无需账号。</p></div>
+      <div class="lp-settings-section">
+        <div class="lp-inline"><button type="button" class="lp-primary" data-invite-create>生成配对邀请</button><button type="button" data-invite-copy>复制邀请</button></div>
+        <label class="lp-device-field"><span>本机邀请</span><textarea rows="3" readonly data-invitation aria-label="本机配对邀请"></textarea></label>
+        <p class="lp-settings-status" data-invitation-expiry></p>
+        <label class="lp-device-field"><span>另一台设备的邀请</span><textarea rows="3" data-pair-code aria-label="另一台设备的配对邀请" placeholder="粘贴另一台机器生成的 linkport1. 邀请"></textarea></label>
+        <button type="button" class="lp-primary" data-pair-add>添加设备</button>
+        <p class="lp-settings-status" data-device-message role="status"></p>
+      </div>
+      <div class="lp-settings-section"><span>已配对设备</span><div data-paired-devices></div></div>
+      <details><summary>网络与密钥</summary>
+        <label class="lp-device-field"><span>中继模式</span><select data-relay-mode aria-label="中继模式"><option value="default">公共中继</option><option value="custom">自定义中继</option><option value="disabled">仅直连</option></select></label>
+        <label class="lp-device-field"><span>自定义中继地址</span><textarea rows="2" data-relay-urls aria-label="自定义中继地址" placeholder="每行一个 HTTPS 地址"></textarea></label>
+        <label class="lp-device-field"><span>自定义地址发现服务</span><input data-discovery-url aria-label="自定义地址发现服务" placeholder="可选的 HTTPS pkarr 服务地址"></label>
+        <p class="lp-settings-status">仅直连模式不访问公共中继或公共地址发现。自定义模式留空地址发现时使用邀请中的地址和局域网发现。</p>
+        <button type="button" data-network-save>保存并暂停网络</button>
+        <p class="lp-settings-status">保存后需重启 Linkport。网络切换会断开远端会话，本机监听继续运行。</p>
+        <label class="lp-device-field"><span>重置本机身份</span><input data-reset-confirmation aria-label="重置身份确认" placeholder="输入完整本机设备 ID 确认"></label>
+        <p class="lp-settings-status">重置会生成新密钥、清除配对并断开远端会话。其他机器需移除旧设备并重新配对；本机重置不能撤销它们对旧密钥的信任。</p>
+        <button type="button" data-identity-reset>重置本机身份</button>
+      </details>
     </div>
   </dialog>
   <dialog class="lp-settings" data-connect-dialog aria-labelledby="lp-connect-title">
@@ -430,9 +464,9 @@
   if (!nativeDesktop) {
   for (const template of all("template[data-demo-shares], template[data-demo-devices]")) template.replaceWith(template.content.cloneNode(true));
   find("[data-host-name]").textContent = "dev-machine";
-  find("[data-host-ip]").textContent = "100.101.10.8";
+  find("[data-host-ip]").textContent = "a17c8f09e3d2…";
   find("[data-discovery-summary]").textContent = "2 台可用 · 1 台离线";
-  find("[data-network-state]").textContent = "Tailscale 已连接";
+  find("[data-network-state]").textContent = "iroh 已就绪";
   const portDetails = {
     esp32: { host: "lab-linux", label: "ESP32 调试板", remotePath: "/dev/ttyUSB0", mount: "lab-esp32", baud: "115200" },
     stm32: { host: "lab-linux", label: "STM32 控制板", remotePath: "/dev/ttyACM0", mount: "lab-stm32", baud: "115200" },
@@ -759,10 +793,10 @@
   drawSharing();
   const scene = new URLSearchParams(window.location.search).get("scene");
   const scenes = {
-    "tailscale-missing": { status: "Tailscale 未安装", title: "先连接到你的 Tailscale 网络", copy: "请在本机安装 Tailscale 并登录，再回到这里发现其他机器。" },
-    "tailscale-offline": { status: "Tailscale 未连接", title: "本机尚未连接网络", copy: "请在 Tailscale 中开启连接。恢复后会自动刷新可访问的机器。" },
-    "service-missing": { status: "Tailscale 已连接", title: "尚未发现 Linkport 共享服务", copy: "请在对端安装并启动 Linkport，再选择允许共享的串口。" },
-    "ports-empty": { status: "Tailscale 已连接", title: "对端尚未共享串口", copy: "已发现 lab-linux。请在对端的「共享」中勾选一个串口，本机列表会自动更新。" }
+    "unpaired": { status: "iroh 已就绪", title: "添加你的第一台设备", copy: "通过一次性邀请配对自己的机器，无需注册或登录。" },
+    "network-offline": { status: "网络未运行", title: "本机尚未连接网络", copy: "检查网络设置后重新启动 Linkport。" },
+    "service-missing": { status: "iroh 已就绪", title: "尚未发现 Linkport 共享服务", copy: "请在对端安装并启动 Linkport，再选择允许共享的串口。" },
+    "ports-empty": { status: "iroh 已就绪", title: "对端尚未共享串口", copy: "已发现 lab-linux。请在对端的「共享」中勾选一个串口，本机列表会自动更新。" }
   };
   if (scenes[scene]) {
     const state = scenes[scene];
@@ -776,7 +810,7 @@
     find("[data-empty-title]").textContent = state.title;
     find("[data-empty-copy]").textContent = state.copy;
     find("[data-network-state]").textContent = state.status;
-    if (scene.startsWith("tailscale-")) find("[data-network-state]").style.color = "var(--lp-warn)";
+    if (scene === "network-offline") find("[data-network-state]").style.color = "var(--lp-warn)";
     find("[data-discovery-summary]").textContent = scene === "ports-empty" ? "1 台设备 · 0 个共享串口" : "等待服务就绪";
   }
   if (scene === "local-new" || scene === "local-offline") {
@@ -800,7 +834,7 @@
   let preferenceRevision = 0;
   let saveQueue = Promise.resolve();
   let updateState = { configured: false, state: "unconfigured" };
-  let tailState = null;
+  let networkState = null;
   let settingsPoll = null;
   const settingsDialog = find("[data-settings-dialog]");
   try {
@@ -823,6 +857,61 @@
     return response.status === 202 || response.status === 204 ? null : response.json();
   }
   const translations = {
+    "身份密钥仅保存在本机。请通过邀请添加其他设备，无需账号。": "Identity keys stay on this device. Add devices with invitations; no account is needed.",
+    "本机配对邀请": "Pairing invitation from this device",
+    "另一台设备的配对邀请": "Pairing invitation from another device",
+    "粘贴另一台机器生成的 linkport1. 邀请": "Paste the linkport1. invitation from the other device",
+    "仅可使用一次，有效期 5 分钟；生成新邀请会使旧邀请失效。": "Single use, valid for 5 minutes. A new invitation replaces the previous one.",
+    "将邀请复制到另一台机器的 Linkport。请仅发送给你信任的人。": "Copy this invitation into Linkport on the other device. Share only with someone you trust.",
+    "邀请已复制": "Invitation copied",
+    "请复制选中的配对邀请": "Copy the selected invitation",
+    "正在验证设备身份并配对…": "Verifying device identity and pairing…",
+    "配对成功，双方已保存对方的设备公钥。": "Paired. Both devices have saved each other’s public key.",
+    "设置已保存，网络连接已暂停。请重启 Linkport。": "Settings saved and networking paused. Restart Linkport to apply.",
+    "本机身份已重置，配对关系已清除。请重启并重新配对设备。": "Identity reset and paired devices cleared. Restart and pair your devices again.",
+    "请重启 Linkport 使配置生效": "Restart Linkport to apply changes",
+    "设备身份已就绪，无需登录": "Device identity ready; no sign-in required",
+    "无法读取设备状态": "Unable to read device status",
+    "在桌面版中管理真实设备": "Manage real devices in the desktop app",
+    "在桌面版中生成配对邀请": "Create invitations in the desktop app",
+    "在桌面版中添加设备": "Add devices in the desktop app",
+    "每行一个 HTTPS 地址": "One HTTPS URL per line",
+    "可选的 HTTPS pkarr 服务地址": "Optional HTTPS pkarr service URL",
+    "仅直连模式不访问公共中继或公共地址发现。自定义模式留空地址发现时使用邀请中的地址和局域网发现。": "Direct-only mode uses no public relay or discovery. Custom mode without a discovery URL uses invitation addresses and LAN discovery.",
+    "保存后需重启 Linkport。网络切换会断开远端会话，本机监听继续运行。": "Restart Linkport after saving. Network changes disconnect remote sessions; local monitoring continues.",
+    "输入完整本机设备 ID 确认": "Enter the full current device ID to confirm",
+    "重置身份确认": "Confirm identity reset",
+    "重置会生成新密钥、清除配对并断开远端会话。其他机器需移除旧设备并重新配对；本机重置不能撤销它们对旧密钥的信任。": "Reset creates a new key, clears paired devices and disconnects remote sessions. Remove the old device on your other machines and pair again; this reset cannot revoke their trust in the old key.",
+    "添加你的第一台设备": "Add your first device",
+    "通过一次性邀请配对自己的机器，无需注册或登录。": "Pair your machines with a single-use invitation. No account or sign-in.",
+    "网络或身份配置已变更，重启后生效。": "Network or identity settings changed. Restart to apply.",
+    "网络就绪后可供已配对设备访问": "Available to paired devices when networking is ready",
+    "请在对端运行 Linkport，并检查直连或中继的网络可达性": "Run Linkport on the other device and check direct or relay connectivity",
+    "设备与配对": "Devices and pairing",
+    "添加设备": "Add device",
+    "管理设备": "Manage devices",
+    "本机设备 ID": "This device ID",
+    "生成配对邀请": "Create pairing invitation",
+    "复制邀请": "Copy invitation",
+    "本机邀请": "This device invitation",
+    "另一台设备的邀请": "Invitation from another device",
+    "已配对设备": "Paired devices",
+    "尚未配对设备": "No paired devices",
+    "移除并断开": "Remove and disconnect",
+    "网络与设备": "Network and devices",
+    "网络与密钥": "Network and keys",
+    "中继模式": "Relay mode",
+    "公共中继": "Public relays",
+    "自定义中继地址": "Custom relay URLs",
+    "自定义中继": "Custom relays",
+    "仅直连": "Direct only",
+    "自定义地址发现服务": "Custom address discovery",
+    "保存并暂停网络": "Save and pause network",
+    "重置本机身份": "Reset device identity",
+    "关闭设备管理": "Close device management",
+    "iroh 已就绪": "iroh ready",
+    "网络未运行": "Network unavailable",
+    "请重启 Linkport": "Please restart Linkport",
     "关闭窗口后保留状态栏": "Keep in menu bar when window closes",
     "关闭后后台运行": "Keep running in background",
     "连接串口": "Connect serial port",
@@ -838,7 +927,6 @@
     "com0com 配对端口": "com0com paired port",
     "取消": "Cancel",
     "正在连接": "Connecting",
-    "未登录 Tailscale": "Sign in to Tailscale",
     "尚未发现其他设备": "No other devices found",
     "服务不可达": "Service unreachable",
     "版本不兼容": "Incompatible version",
@@ -860,14 +948,6 @@
     "文字大小": "Text size",
     "简体中文": "Simplified Chinese",
     "跟随系统": "System",
-    "登录 Tailscale": "Sign in to Tailscale",
-    "连接 Tailscale": "Connect to Tailscale",
-    "Tailscale 状态待确认": "Tailscale status unavailable",
-    "安装 Tailscale": "Install Tailscale",
-    "未安装 Tailscale": "Tailscale is not installed",
-    "Tailscale 已连接": "Tailscale connected",
-    "Tailscale 未连接": "Tailscale disconnected",
-    "Tailscale 不可用": "Tailscale unavailable",
     "无法读取状态": "Unable to read status",
     "操作失败，请重试": "Action failed. Please try again.",
     "重启并更新": "Restart to update",
@@ -988,17 +1068,13 @@
       if (JSON.stringify(snapshot) === JSON.stringify(preferences)) find("[data-preference-status]").textContent = "已保存";
     }).catch(() => { find("[data-preference-status]").textContent = "保存失败"; });
   });
-  async function refreshTail() {
+  async function refreshNetwork() {
     if (!nativeDesktop) return;
     try {
-      tailState = await nativeRequest("tailscale");
-      find("[data-network-state]").textContent = tailState.stale ? "Tailscale 状态待确认" : tailState.state === "Running" ? "Tailscale 已连接" : tailState.state === "NeedsLogin" ? "未登录 Tailscale" : tailState.installed ? "Tailscale 未连接" : "登录 Tailscale";
-      find("[data-tail-status]").textContent = tailState.loggingIn ? "请在浏览器中完成登录" : tailState.error ? "无法读取状态" : tailState.state === "Running" ? "已连接" : tailState.installed ? "未连接" : "未安装 Tailscale";
-      find("[data-settings-login]").textContent = tailState.state === "Stopped" ? "连接 Tailscale" : tailState.installed ? "登录 Tailscale" : "安装 Tailscale";
-      find("[data-settings-login]").disabled = tailState.loggingIn;
-      find("[data-host-name]").textContent = tailState.hostName || "本机";
-      find("[data-host-ip]").textContent = tailState.ips?.[0] || "—";
-    } catch { find("[data-tail-status]").textContent = "无法读取状态"; }
+      networkState = await nativeRequest("network");
+      find("[data-network-status]").textContent = networkState.restartRequired ? "请重启 Linkport 使配置生效" : networkState.state === "Running" ? "设备身份已就绪，无需登录" : "网络未运行";
+      find("[data-device-id]").textContent = networkState.nodeID;
+    } catch { find("[data-network-status]").textContent = "无法读取设备状态"; }
   }
   async function refreshUpdate() {
     if (!nativeDesktop) return;
@@ -1013,29 +1089,128 @@
   }
   function openSettings() {
     if (!settingsDialog.open) settingsDialog.showModal();
-    refreshTail();
+    refreshNetwork();
     refreshUpdate();
-    if (nativeDesktop && !settingsPoll) settingsPoll = setInterval(() => { refreshTail(); refreshUpdate(); }, 3000);
+    if (nativeDesktop && !settingsPoll) settingsPoll = setInterval(() => { refreshNetwork(); refreshUpdate(); }, 3000);
   }
   find("[data-settings-open]").addEventListener("click", openSettings);
   find("[data-settings-close]").addEventListener("click", () => settingsDialog.close());
   settingsDialog.addEventListener("close", () => { clearInterval(settingsPoll); settingsPoll = null; });
-  async function loginTailscale() {
-    if (!nativeDesktop) {
-      openSettings();
-      find("[data-tail-status]").textContent = "桌面版中登录";
-      return;
+  const devicesDialog = find("[data-devices-dialog]");
+  let devicesPoll = null;
+  let devicesSignature = "";
+  let networkFormLoaded = false;
+  const deviceMessage = message => { find("[data-device-message]").textContent = message; };
+  async function refreshDevices() {
+    if (!nativeDesktop) { deviceMessage("在桌面版中管理真实设备"); return; }
+    await refreshNetwork();
+    if (!networkFormLoaded && networkState) {
+      find("[data-relay-mode]").value = networkState.config.relayMode;
+      find("[data-relay-urls]").value = (networkState.config.relayURLs || []).join("\n");
+      find("[data-discovery-url]").value = networkState.config.discoveryURL || "";
+      networkFormLoaded = true;
+      updateNetworkFields();
     }
-    try {
-      await nativeRequest("tailscale/login", "POST");
-      find("[data-tail-status]").textContent = "请在浏览器中完成登录";
-      refreshTail();
-    } catch { find("[data-tail-status]").textContent = "操作失败，请重试"; }
+    const peers = await nativeRequest("devices");
+    const signature = JSON.stringify(peers);
+    if (signature === devicesSignature) return;
+    devicesSignature = signature;
+    const list = find("[data-paired-devices]");
+    list.replaceChildren();
+    if (!peers.length) {
+      const empty = document.createElement("p");
+      empty.className = "lp-settings-status";
+      empty.textContent = "尚未配对设备";
+      list.append(empty);
+    }
+    for (const peer of peers) {
+      const row = document.createElement("div"); row.className = "lp-setting";
+      const details = document.createElement("div"); details.className = "lp-setting-info";
+      const name = document.createElement("span"); name.textContent = peer.hostName;
+      const id = document.createElement("code"); id.textContent = peer.id.slice(0, 12) + "…"; id.title = peer.id;
+      details.append(name, id);
+      const remove = document.createElement("button"); remove.type = "button"; remove.textContent = "移除并断开";
+      remove.dataset.deviceRemove = peer.id;
+      remove.addEventListener("click", async () => {
+        remove.disabled = true;
+        try { await nativeRequest("devices", "DELETE", { id: peer.id }); await refreshDevices(); }
+        catch (error) { deviceMessage(error.message); remove.disabled = false; }
+      });
+      row.append(details, remove); list.append(row);
+    }
   }
-  find("[data-settings-login]").addEventListener("click", loginTailscale);
-  find("[data-tailscale-login]").addEventListener("click", () => {
-    if (tailState?.state === "Running") openSettings();
-    else loginTailscale();
+  function openDevices() {
+    if (settingsDialog.open) settingsDialog.close();
+    if (!devicesDialog.open) devicesDialog.showModal();
+    networkFormLoaded = false;
+    deviceMessage("");
+    refreshDevices().catch(error => deviceMessage(error.message));
+    if (!devicesPoll) devicesPoll = setInterval(() => refreshDevices().catch(error => deviceMessage(error.message)), 3000);
+  }
+  for (const button of all("[data-device-manager-open], [data-live-add]")) button.addEventListener("click", openDevices);
+  find("[data-devices-close]").addEventListener("click", () => devicesDialog.close());
+  devicesDialog.addEventListener("close", () => {
+    clearInterval(devicesPoll); devicesPoll = null;
+    find("[data-invitation]").value = "";
+    find("[data-pair-code]").value = "";
+    find("[data-reset-confirmation]").value = "";
+  });
+  find("[data-invite-create]").addEventListener("click", async event => {
+    if (!nativeDesktop) { deviceMessage("在桌面版中生成配对邀请"); return; }
+    const button = event.currentTarget; button.disabled = true;
+    try {
+      const invite = await nativeRequest("devices/invite", "POST");
+      find("[data-invitation]").value = invite.code;
+      find("[data-invitation-expiry]").textContent = "仅可使用一次，有效期 5 分钟；生成新邀请会使旧邀请失效。";
+      deviceMessage("将邀请复制到另一台机器的 Linkport。请仅发送给你信任的人。");
+    } catch (error) { deviceMessage(error.message); }
+    finally { button.disabled = false; }
+  });
+  find("[data-invite-copy]").addEventListener("click", async () => {
+    const input = find("[data-invitation]");
+    if (!input.value) return;
+    try { await navigator.clipboard.writeText(input.value); deviceMessage("邀请已复制"); }
+    catch { input.focus(); input.select(); deviceMessage("请复制选中的配对邀请"); }
+  });
+  find("[data-pair-add]").addEventListener("click", async event => {
+    if (!nativeDesktop) { deviceMessage("在桌面版中添加设备"); return; }
+    const button = event.currentTarget; button.disabled = true;
+    deviceMessage("正在验证设备身份并配对…");
+    try {
+      await nativeRequest("devices", "POST", { code: find("[data-pair-code]").value.trim() });
+      find("[data-pair-code]").value = "";
+      deviceMessage("配对成功，双方已保存对方的设备公钥。");
+      await refreshDevices();
+      await nativeRequest("refresh", "POST");
+    } catch (error) { deviceMessage(error.message); }
+    finally { button.disabled = false; }
+  });
+  function updateNetworkFields() {
+    const mode = find("[data-relay-mode]").value;
+    find("[data-relay-urls]").disabled = mode !== "custom";
+    find("[data-discovery-url]").disabled = mode === "disabled";
+  }
+  find("[data-relay-mode]").addEventListener("change", updateNetworkFields);
+  find("[data-network-save]").addEventListener("click", async () => {
+    if (!nativeDesktop) return;
+    try {
+      await nativeRequest("network", "PUT", {
+        relayMode: find("[data-relay-mode]").value,
+        relayURLs: find("[data-relay-mode]").value === "custom" ? find("[data-relay-urls]").value.split(/[\s,]+/).filter(Boolean) : [],
+        discoveryURL: find("[data-relay-mode]").value === "disabled" ? "" : find("[data-discovery-url]").value.trim()
+      });
+      deviceMessage("设置已保存，网络连接已暂停。请重启 Linkport。");
+      await refreshNetwork();
+    } catch (error) { deviceMessage(error.message); }
+  });
+  find("[data-identity-reset]").addEventListener("click", async () => {
+    if (!nativeDesktop) return;
+    try {
+      await nativeRequest("identity/reset", "POST", { confirmation: find("[data-reset-confirmation]").value.trim() });
+      deviceMessage("本机身份已重置，配对关系已清除。请重启并重新配对设备。");
+      find("[data-reset-confirmation]").value = "";
+      await refreshDevices();
+    } catch (error) { deviceMessage(error.message); }
   });
   find("[data-update-action]").addEventListener("click", async () => {
     if (!nativeDesktop) {
@@ -1055,8 +1230,8 @@
     nativeRequest("preferences").then(saved => {
       if (preferenceRevision === revision) { preferences = saved; applyPreferences(); }
     }).catch(() => { find("[data-preference-status]").textContent = "保存失败"; });
-    refreshTail();
-    setInterval(refreshTail, 15000);
+    refreshNetwork();
+    setInterval(refreshNetwork, 15000);
   }
   if (globalThis.Tweak) {
     const tweaks = { spacing: 20 };

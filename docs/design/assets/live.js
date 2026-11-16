@@ -3,7 +3,7 @@ globalThis.initializeLinkportLive = (root, request) => {
   const all = selector => [...root.querySelectorAll(selector)];
   const platform = document.querySelector('meta[name="linkport-host-platform"]')?.content;
   const svgNamespace = "http://www.w3.org/2000/svg";
-  let state = { tailscale: {}, localPorts: [], sharedPorts: [], devices: [], sessions: [] };
+  let state = { network: {}, localPorts: [], sharedPorts: [], devices: [], sessions: [] };
   let selected = null;
   let pendingTarget = null;
   let refreshing = false;
@@ -184,11 +184,11 @@ globalThis.initializeLinkportLive = (root, request) => {
       machine.append(element("span", "lp-dot"), icon("machine"));
       const name = element("span", "lp-machine-name", device.hostName);
       name.title = device.dnsName || device.hostName;
-      machine.append(name, element("code", "lp-machine-meta", device.ips?.[0] || ""));
+      machine.append(name, element("code", "lp-machine-meta", device.id.slice(0, 10) + "…"));
       const labels = { offline: "离线", unreachable: "服务不可达", incompatible: "版本不兼容" };
       const label = available ? (device.ports.length ? device.ports.length + " 个共享串口" : "没有共享串口") : (labels[device.service] || "服务不可达");
       const meta = element("span", "lp-right", label);
-      if (!available && device.online) meta.title = "请在对端运行 Linkport，并允许 Tailscale 访问 TCP 7700";
+      if (!available && device.online) meta.title = "请在对端运行 Linkport，并检查直连或中继的网络可达性";
       machine.append(meta);
       article.append(machine);
       if (available) {
@@ -292,8 +292,7 @@ globalThis.initializeLinkportLive = (root, request) => {
     find("[data-share-count]").textContent = state.sharedPorts.length + " 个共享";
     const service = find("[data-service-status]");
     service.textContent = state.localError ? "串口读取失败：" + state.localError :
-      state.serviceError ? "共享服务：" + state.serviceError :
-      state.sharedPorts.length && state.tailscale.state !== "Running" ? "连接 Tailscale 后可供其他机器访问" : "";
+      state.sharedPorts.length && state.network.state !== "Running" ? "网络就绪后可供已配对设备访问" : "";
     service.hidden = !service.textContent;
   }
   function renderMappings() {
@@ -382,25 +381,21 @@ globalThis.initializeLinkportLive = (root, request) => {
     find("[data-action=export]").title = "导出当前会话全部缓冲日志，包含筛选隐藏的内容";
   }
   function render() {
-    const network = state.tailscale;
-    const label = network.stale ? "Tailscale 状态待确认" : network.state === "Running" ? "Tailscale 已连接" :
-      network.state === "NeedsLogin" ? "未登录 Tailscale" :
-      network.state === "NotInstalled" ? "未安装 Tailscale" :
-      network.state ? "Tailscale 未连接" : "正在读取 Tailscale";
+    const network = state.network;
+    const label = network.restartRequired ? "请重启 Linkport" : network.state === "Running" ? "iroh 已就绪" : "网络未运行";
     find("[data-network-state]").textContent = label;
     find("[data-host-name]").textContent = network.hostName || "本机";
-    find("[data-host-ip]").textContent = network.ips?.[0] || "—";
+    find("[data-host-ip]").textContent = network.nodeID ? network.nodeID.slice(0, 12) + "…" : "—";
+    find("[data-host-ip]").title = network.nodeID || "";
     const online = state.devices.filter(device => device.online).length;
     find("[data-discovery-summary]").textContent = state.devices.length ? online + " 台可用 · " + (state.devices.length - online) + " 台离线" : "";
     const empty = !state.devices.length;
     find(".lp-topology").hidden = empty;
     find("[data-connection-empty]").hidden = !empty;
-    find("[data-empty-title]").textContent = network.state === "Running" ? "尚未发现其他设备" : label;
-    find("[data-empty-copy]").textContent = network.state === "Running" ? "在另一台机器上连接同一 Tailscale 网络。" :
-      network.error || (network.state === "NeedsMachineAuth" ? "请在 Tailscale 管理后台批准此设备。" :
-      network.state === "Stopped" ? "请在 Tailscale 中开启网络连接。" : "登录后自动刷新设备清单。");
-    find("[data-live-login]").hidden = !empty || network.state === "Running" || !network.state;
-    find("[data-live-login]").textContent = network.state === "Stopped" ? "连接 Tailscale" : network.state === "NotInstalled" ? "安装 Tailscale" : "登录 Tailscale";
+    find("[data-empty-title]").textContent = network.restartRequired ? "请重启 Linkport" : "添加你的第一台设备";
+    find("[data-empty-copy]").textContent = network.restartRequired ? "网络或身份配置已变更，重启后生效。" : "通过一次性邀请配对自己的机器，无需注册或登录。";
+    find("[data-live-add]").hidden = !empty;
+    find("[data-live-add]").textContent = "添加设备";
     renderDevices();
     renderSharing();
     renderLocalPicker();
@@ -498,7 +493,6 @@ globalThis.initializeLinkportLive = (root, request) => {
     try { await request("refresh", "POST"); await refresh(); }
     catch (error) { toast(error.message); }
   });
-  find("[data-live-login]").addEventListener("click", () => find("[data-tailscale-login]").click());
   find("[data-session-select]").addEventListener("change", event => { selected = event.target.value; renderLog(true); });
   find("[data-action=disconnect]").addEventListener("click", () => {
     const session = currentSession();

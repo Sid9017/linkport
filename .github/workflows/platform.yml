@@ -112,7 +112,7 @@ jobs:
         if: inputs.platform != 'windows'
         run: |
           mkdir -p dist/ci
-          go test -race -json -count=1 -timeout=5m ./internal/vport ./internal/session ./internal/engine | tee dist/ci/vport.json
+          go test -race -json -count=1 -timeout=5m ./internal/vport ./internal/session ./internal/engine ./internal/p2p | tee dist/ci/vport.json
       - name: Test Windows adapter and com0com decoder without driver
         if: inputs.platform == 'windows'
         run: |

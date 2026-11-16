@@ -9,6 +9,7 @@ import (
 	"net/http"
 
 	"github.com/Sid9017/linkport/internal/engine"
+	"github.com/Sid9017/linkport/internal/p2p"
 	"github.com/Sid9017/linkport/internal/vport"
 )
 
@@ -16,7 +17,6 @@ type nativeAPI struct {
 	ctx                  context.Context
 	token                string
 	preferences          *preferenceStore
-	tailscale            *tailscaleClient
 	updates              *updateController
 	engine               *engine.Engine
 	onPreferencesChanged func(preferences)
@@ -178,16 +178,14 @@ func (api *nativeAPI) handler() http.Handler {
 		}
 		nativeJSON(writer, api.preferences.get())
 	})
-	mux.HandleFunc("GET /native/v1/tailscale", func(writer http.ResponseWriter, request *http.Request) {
-		nativeJSON(writer, api.tailscale.status(request.Context()))
-	})
-	mux.HandleFunc("POST /native/v1/tailscale/login", func(writer http.ResponseWriter, request *http.Request) {
-		if err := api.tailscale.beginLogin(); err != nil {
-			http.Error(writer, "unable to start Tailscale login", http.StatusBadRequest)
-			return
-		}
-		writer.WriteHeader(http.StatusAccepted)
-	})
+	for _, pattern := range []string{
+		"GET /native/v1/network", "GET /native/v1/devices",
+		"POST /native/v1/devices/invite", "POST /native/v1/devices",
+		"DELETE /native/v1/devices", "PUT /native/v1/network",
+		"POST /native/v1/identity/reset",
+	} {
+		mux.HandleFunc(pattern, api.manageDevices)
+	}
 	mux.HandleFunc("GET /native/v1/update", func(writer http.ResponseWriter, request *http.Request) {
 		nativeJSON(writer, api.updates.snapshot())
 	})
@@ -218,6 +216,62 @@ func (api *nativeAPI) handler() http.Handler {
 		writer.Header().Set("X-Content-Type-Options", "nosniff")
 		mux.ServeHTTP(writer, request)
 	})
+}
+
+func (api *nativeAPI) manageDevices(writer http.ResponseWriter, request *http.Request) {
+	if api.engine == nil {
+		http.Error(writer, "device service unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	network := api.engine.Network()
+	var result any
+	var err error
+	switch request.Method + " " + request.URL.Path {
+	case "GET /native/v1/network":
+		result = network.Status()
+	case "GET /native/v1/devices":
+		result = network.Peers()
+	case "POST /native/v1/devices/invite":
+		result, err = network.CreateInvitation()
+	case "POST /native/v1/devices":
+		var command struct {
+			Code string `json:"code"`
+		}
+		if !decodeNative(writer, request, &command) {
+			return
+		}
+		result, err = api.engine.AddDevice(request.Context(), command.Code)
+	case "DELETE /native/v1/devices":
+		var command struct {
+			ID string `json:"id"`
+		}
+		if !decodeNative(writer, request, &command) {
+			return
+		}
+		err = api.engine.RemoveDevice(command.ID)
+		result = network.Peers()
+	case "PUT /native/v1/network":
+		var cfg p2p.NetworkConfig
+		if !decodeNative(writer, request, &cfg) {
+			return
+		}
+		err = network.SaveConfig(cfg)
+		result = network.Status()
+	case "POST /native/v1/identity/reset":
+		var command struct {
+			Confirmation string `json:"confirmation"`
+		}
+		if !decodeNative(writer, request, &command) {
+			return
+		}
+		err = network.ResetIdentity(command.Confirmation)
+		result = network.Status()
+	}
+	if err != nil {
+		http.Error(writer, err.Error(), http.StatusConflict)
+		return
+	}
+	nativeJSON(writer, result)
 }
 
 func decodeNative(writer http.ResponseWriter, request *http.Request, value any) bool {
