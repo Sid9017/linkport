@@ -124,7 +124,7 @@ func (store *FileStore) Save(ctx context.Context, state State) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if err := os.Rename(file.Name(), store.path); err != nil {
+	if err := replaceConfigFile(file.Name(), store.path); err != nil {
 		return err
 	}
 	return nil
