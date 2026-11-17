@@ -781,7 +781,7 @@ async function checkApplicationUpdates(page, browserName) {
   update = { configured: false, state: "development", version: "0.0.2-dev.1794913200.g012345abcdef", channel: "dev" };
   await page.reload({ waitUntil: "networkidle" });
   await page.locator("[data-settings-open]").click();
-  await page.waitForFunction(() => document.querySelector("[data-update-status]").textContent.includes("开发构建"));
+  await page.waitForFunction(() => document.querySelector("[data-update-status]").textContent.includes("本地构建"));
   assert.equal(await page.locator("[data-update-action]").isDisabled(), true);
   assert.equal(await page.locator("[data-update-badge]").isVisible(), false);
 }

@@ -1227,7 +1227,8 @@
     "暂不可用": "Unavailable",
     "更新中继配置": "Update relay configuration",
     "随应用更新": "Updated with the app",
-    "开发构建，不自动更新": "Development build; automatic updates disabled",
+    "本地构建，不自动更新": "Local build; automatic updates disabled",
+    "本地构建": "Local build",
     "更新服务暂不可用，请稍后重试": "Update service unavailable; try again later",
     "当前使用东京公共中继，节点随应用更新。": "The Tokyo public relay is included and updated with the app.",
     "使用 Linkport 维护的公共中继与协同发现。": "Use Linkport public relays and peer-assisted discovery.",
@@ -1365,8 +1366,8 @@
     try {
       [updateState, relayUpdateState] = await Promise.all([nativeRequest("update"), nativeRequest("relay-update")]);
       if (updateState.version) all("[data-app-version]").forEach(node=>{node.textContent=updateState.version;node.title=updateState.version;});
-      find("[data-app-channel]").textContent=({stable:"Stable",nightly:"Nightly",dev:"Dev"})[updateState.channel] || "";
-      const labels = { development:"开发构建，不自动更新", unconfigured: "发布签名未配置", idle: "检查更新", checking: "正在检查更新", "up-to-date": "当前没有可用更新", available: "发现新版本", downloading: "正在下载", verifying: "正在校验", installing: "准备更新", ready: "更新已就绪", error: "更新服务暂不可用，请稍后重试" };
+      find("[data-app-channel]").textContent=({stable:"Stable",nightly:"Nightly",dev:"本地构建"})[updateState.channel] || "";
+      const labels = { development:"本地构建，不自动更新", unconfigured: "发布签名未配置", idle: "检查更新", checking: "正在检查更新", "up-to-date": "当前没有可用更新", available: "发现新版本", downloading: "正在下载", verifying: "正在校验", installing: "准备更新", ready: "更新已就绪", error: "更新服务暂不可用，请稍后重试" };
       find("[data-update-status]").textContent = (labels[updateState.state] || updateState.state) + (updateState.next ? " · " + updateState.next : "");
       const relayLabels={bundled:"随应用更新",idle:"等待检查",checking:"正在检查更新","up-to-date":"已是最新配置",available:"有中继配置更新",error:"检查失败",unavailable:"暂不可用"};
       find("[data-relay-update-status]").textContent=(relayLabels[relayUpdateState.state] || relayUpdateState.state)+" · v"+(relayUpdateState.version || 0)+(relayUpdateState.error ? " · "+relayUpdateState.error : "");
