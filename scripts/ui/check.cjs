@@ -48,6 +48,16 @@ async function settleMotion(page) {
   });
 }
 
+async function checkCloseFrame(page, selector) {
+  const button = page.locator(selector);
+  await button.focus();
+  const frame = await button.evaluate(node => {
+    const style = getComputedStyle(node);
+    return { border: style.borderTopWidth, outline: style.outlineStyle, shadow: style.boxShadow };
+  });
+  assert.deepEqual(frame, { border: "0px", outline: "none", shadow: "none" });
+}
+
 async function checkFunctional(page, browserName) {
   const errors = [];
   page.on("pageerror", error => errors.push(error.message));
@@ -63,6 +73,8 @@ async function checkFunctional(page, browserName) {
   assert.ok(await page.evaluate(() => window.nativeMessages.includes("wails:drag")), "title bar did not dispatch native dragging");
   const beforeDrag = await page.evaluate(() => window.nativeMessages.filter(message => message === "wails:drag").length);
   await page.locator("[data-settings-open]").click();
+  await checkCloseFrame(page, "[data-settings-close]");
+  await page.screenshot({ path: path.join(output, `${browserName}-settings-close-focus.png`) });
   await page.locator("[data-settings-close]").click();
   assert.equal(await page.evaluate(() => window.nativeMessages.filter(message => message === "wails:drag").length), beforeDrag);
   const initial = await page.evaluate(async () => {
@@ -84,7 +96,11 @@ async function checkFunctional(page, browserName) {
   };
   const fixture = {
     network: { state: "Running", nodeID: "a".repeat(64), hostName: "local-test", config: { relayMode: "disabled", relayURLs: [] } },
-    devices: [peer], localPorts: [{ id: "local-test", path: "/dev/local-fixture", product: "Local fixture", shared: false }],
+    devices: [peer], localPorts: [
+      { id: "local-test", path: "/dev/local-fixture", product: "Local fixture", shared: false, is_usb: true },
+      { id: "bluetooth-test", path: "/dev/rfcomm0", product: "Bluetooth fixture", shared: false },
+      { id: "uart-test", path: "/dev/ttyS0", product: "UART fixture", shared: false },
+    ],
     sharedPorts: [], sessions: [], refreshing: false,
   };
   const sent = [];
@@ -108,7 +124,7 @@ async function checkFunctional(page, browserName) {
         portPath: body.path, label: "Local fixture", localPath: body.path, connected: true, baudRate: body.baudRate,
         records: [{ sequence: 1, time: "2026-11-16T07:02:03.456Z", kind: "RX", data: Buffer.from("local only").toString("base64") }],
       };
-      fixture.sessions.push(response);
+      fixture.sessions = [...fixture.sessions.filter(session => session.id !== response.id), response];
     } else if (operation === "share") {
       shared.push(body);
       fixture.localPorts[0].shared = body.shared;
@@ -135,11 +151,16 @@ async function checkFunctional(page, browserName) {
         connected: true, baudRate: 9600,
         records: [{ sequence: 1, time: "2026-11-16T07:00:00.123Z", kind: "RX", data: Buffer.from([255, 0, 13, 10, 195, 169]).toString("base64") }],
       };
+      response.records.push(...Array.from({ length: 70 }, (_, index) => ({
+        sequence: index + 2, time: "2026-11-16T07:00:00.456Z", kind: "SYS", message: "history " + index,
+      })));
       fixture.sessions = [response];
     } else if (operation === "send") {
       sent.push(body);
-      fixture.sessions.find(session => session.id === body.id).records.push({
-        sequence: sent.length + 1, time: "2026-11-16T07:00:01.234Z", kind: "TX", data: body.data,
+      const session = fixture.sessions.find(session => session.id === body.id);
+      session.records.push({
+        sequence: Math.max(0, ...session.records.map(record => record.sequence)) + 1,
+        time: "2026-11-16T07:00:01.234Z", kind: "TX", data: body.data,
       });
       return route.fulfill({ status: 204 });
     } else if (operation === "clear") {
@@ -157,6 +178,7 @@ async function checkFunctional(page, browserName) {
 
   await page.waitForSelector(".lp-device [data-port-key]");
   await page.getByRole("button", { name: "连接 Test serial fixture", exact: true }).click();
+  await checkCloseFrame(page, ".lp-settings-head [data-connect-cancel]");
   assert.equal(await page.locator("[data-windows-pair]").isVisible(), platform === "windows");
   if (platform === "windows") {
     await page.getByRole("textbox", { name: "本地 COM 端口", exact: true }).fill("COM121");
@@ -175,20 +197,116 @@ async function checkFunctional(page, browserName) {
     page.getByRole("checkbox", { name: "共享 /dev/local-fixture", exact: true }).check(),
   ]);
   assert.deepEqual(shared[0], { id: "local-test", shared: true });
+  for (const type of ["usb", "bluetooth", "uart"]) {
+    assert.equal(await page.locator(`.lp-shareitem [data-transport="${type}"]`).count(), 1);
+  }
   await page.locator("[data-nav=monitor]").click();
-  await page.locator("[data-format]").selectOption("hex");
+  await page.waitForFunction(() => {
+    const log = document.querySelector("[data-log]");
+    return log.scrollHeight - log.scrollTop - log.clientHeight < 3;
+  });
+  assert.equal(await page.locator("[data-hex]").isChecked(), false);
+  assert.equal(await page.locator("[data-format], [data-filter], select[name=ending]").count(), 0);
+  await page.locator("[data-hex]").check();
   assert.ok((await page.getByRole("log").innerText()).includes("ff 00 0d 0a c3 a9"));
-  assert.ok((await page.locator(".lp-logline time").innerText()).endsWith(".123"));
+  assert.ok((await page.locator(".lp-logline time").first().innerText()).endsWith(".123"));
   await page.getByLabel("发送内容", { exact: true }).fill("must-not-send");
-  await page.getByLabel("筛选串口日志", { exact: true }).fill("ff");
-  await page.getByLabel("筛选串口日志", { exact: true }).press("Enter");
+  await page.keyboard.press("Control+f");
+  await page.getByLabel("搜索日志", { exact: true }).fill("ff");
+  await page.getByLabel("搜索日志", { exact: true }).press("Enter");
+  assert.equal(await page.locator("[data-search-count]").textContent(), "1/1");
   assert.equal(sent.length, 0);
   assert.equal(await page.getByLabel("发送内容", { exact: true }).inputValue(), "must-not-send");
-  await page.getByLabel("筛选串口日志", { exact: true }).fill("");
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => document.querySelector("[data-log-search]").hidden);
+  await page.locator("[data-log]").evaluate(node => { node.scrollTop = 0; });
   await page.getByLabel("发送内容", { exact: true }).fill("ping");
   await page.getByRole("button", { name: "发送", exact: true }).click();
   await page.waitForFunction(() => document.querySelector(".lp-send input").value === "");
   assert.equal(Buffer.from(sent[0].data, "base64").toString(), "ping\r\n");
+  await page.locator("[data-log-latest]").waitFor({ state: "visible" });
+  await page.locator("[data-log-latest]").click();
+  await page.waitForFunction(() => {
+    const log = document.querySelector("[data-log]");
+    return log.scrollHeight - log.scrollTop - log.clientHeight < 3;
+  });
+  await page.locator("[data-hex]").uncheck();
+  const remoteSession = fixture.sessions[0];
+  const receive = content => {
+    remoteSession.records.push({
+      sequence: Math.max(0, ...remoteSession.records.map(record => record.sequence)) + 1,
+      time: "2026-11-16T07:00:02.345Z", kind: "RX", data: Buffer.from(content).toString("base64"),
+    });
+  };
+  const send = async command => {
+    await page.locator("[data-connect-dialog]").waitFor({ state: "hidden" });
+    await page.getByLabel("发送内容", { exact: true }).fill(command);
+    assert.equal(await page.getByLabel("发送内容", { exact: true }).inputValue(), command);
+    await page.getByRole("button", { name: "发送", exact: true }).click();
+    await page.waitForFunction(() => document.querySelector(".lp-send input").value === "");
+    return Buffer.from(sent.at(-1).data, "base64").toString();
+  };
+  receive("line-feed\n");
+  await page.waitForFunction(() => document.querySelector("[data-log]").textContent.includes("line-feed"));
+  assert.equal(await send("auto-lf"), "auto-lf\n");
+  receive("carriage-return\r");
+  await page.waitForFunction(() => document.querySelector("[data-log]").textContent.includes("carriage-return"));
+  assert.equal(await send("auto-cr"), "auto-cr\r");
+  receive("\n");
+  const splitCount = remoteSession.records.length;
+  await page.waitForFunction(count => document.querySelectorAll(".lp-logline").length === count, splitCount);
+  assert.equal(await send("auto-crlf"), "auto-crlf\r\n");
+  for (let index = 0; index < 90; index++) receive((index % 35 === 5 ? "needle " : "row ") + index + "\n");
+  await page.waitForFunction(() => document.querySelector("[data-log]").textContent.includes("row 89"));
+  await page.keyboard.press("Meta+f");
+  await page.getByLabel("搜索日志", { exact: true }).fill("needle");
+  await settleMotion(page);
+  assert.equal(await page.locator("[data-search-count]").textContent(), "1/3");
+  await page.locator("[data-log-query]").evaluate(node => node.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", isComposing: true, bubbles: true })));
+  assert.equal(await page.locator("[data-search-count]").textContent(), "1/3", "IME composition must not advance the selected match");
+  assert.equal(await page.locator(".lp-logline").count(), remoteSession.records.length, "search must retain unmatched log rows");
+  await page.locator("[data-search-next]").click();
+  await page.waitForFunction(() => document.querySelector("[data-search-count]").textContent === "2/3");
+  await page.waitForFunction(() => {
+    const row = document.querySelector('[data-search-current="true"]').getBoundingClientRect();
+    const log = document.querySelector("[data-log]").getBoundingClientRect();
+    return Math.abs((row.top + row.bottom - log.top - log.bottom) / 2) < 3;
+  });
+  await page.screenshot({ path: path.join(output, `${browserName}-monitor-search.png`) });
+  const currentMatch = await page.locator('[data-search-current="true"]').getAttribute("data-record-key");
+  const scrollPosition = await page.locator("[data-log]").evaluate(node => node.scrollTop);
+  receive("background update\n");
+  await page.waitForFunction(() => document.querySelector("[data-log]").textContent.includes("background update"));
+  assert.equal(await page.locator('[data-search-current="true"]').getAttribute("data-record-key"), currentMatch);
+  assert.ok(Math.abs(await page.locator("[data-log]").evaluate(node => node.scrollTop) - scrollPosition) < 3);
+  await page.locator("[data-search-prev]").click();
+  assert.equal(await page.locator("[data-search-count]").textContent(), "1/3");
+  await page.getByLabel("搜索日志", { exact: true }).press("Shift+Enter");
+  assert.equal(await page.locator("[data-search-count]").textContent(), "3/3");
+  await page.getByLabel("搜索日志", { exact: true }).fill("missing-query");
+  assert.equal(await page.locator("[data-search-count]").textContent(), "0/0");
+  assert.equal(await page.locator("[data-search-next]").isDisabled(), true);
+  await page.keyboard.press("Escape");
+  await page.waitForFunction(() => document.querySelector("[data-log-search]").hidden);
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.keyboard.press("Control+f");
+  await page.locator("[data-log-query]").fill("needle");
+  await page.locator("[data-search-next]").click();
+  assert.equal(await page.locator("[data-log-search]").evaluate(node => node.getAnimations().length), 0);
+  assert.ok(await page.evaluate(() => {
+    const row = document.querySelector('[data-search-current="true"]').getBoundingClientRect();
+    const log = document.querySelector("[data-log]").getBoundingClientRect();
+    return Math.abs((row.top + row.bottom - log.top - log.bottom) / 2) < 3;
+  }));
+  await page.keyboard.press("Escape");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.locator("[data-port-picker-toggle]").click();
+  for (const type of ["usb", "bluetooth", "uart", "serial"]) {
+    assert.ok(await page.locator(`[data-port-option] [data-transport="${type}"]`).count() > 0);
+  }
+  await settleMotion(page);
+  await page.screenshot({ path: path.join(output, `${browserName}-monitor-ports.png`) });
+  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "导出完整会话", exact: true }).click();
   await page.waitForFunction(() => !document.querySelector("[data-live-toast]").hidden);
   assert.ok((await page.locator("[data-live-toast]").innerText()).includes("fixture.log"));
@@ -201,16 +319,38 @@ async function checkFunctional(page, browserName) {
   await page.getByRole("button", { name: "暂停显示", exact: true }).click();
   await page.getByRole("button", { name: "清空日志", exact: true }).click();
   await page.waitForFunction(() => document.querySelectorAll(".lp-logline").length === 0);
-  await page.locator("[data-local-monitor-open]").click();
+  await page.locator("[data-port-picker-toggle]").click();
+  await page.locator('[data-port-option][data-path="/dev/local-fixture"]').click();
   assert.equal(await page.locator("[data-windows-pair]").isVisible(), false);
-  await page.getByRole("combobox", { name: "本机串口", exact: true }).selectOption("/dev/local-fixture");
+  assert.ok((await page.locator("[data-connect-target]").textContent()).includes("/dev/local-fixture"));
+  const inventory = fixture.localPorts;
+  fixture.localPorts = inventory.filter(port => port.id !== "local-test");
+  await page.waitForFunction(() => document.querySelector("[data-connect-submit]").disabled &&
+    document.querySelector("[data-connect-error]").textContent.includes("已离线"));
+  assert.equal(openedLocal.length, 0, "removing a selected port must not silently open another port");
+  fixture.localPorts = inventory;
+  await page.waitForFunction(() => !document.querySelector("[data-connect-submit]").disabled);
   await page.locator("[data-connect-submit]").click();
   await page.waitForFunction(() => document.querySelector("[data-session-label]").textContent.includes("/dev/local-fixture"));
   assert.equal(openedLocal.length, 1);
   assert.equal(await page.locator("[data-mapping]").count(), 1);
-  await page.locator("[data-format]").selectOption("text");
+  await page.locator("[data-hex]").uncheck();
   assert.ok((await page.getByRole("log").innerText()).includes("local only"));
   assert.equal((await page.getByRole("log").innerText()).includes("ff 00"), false);
+  assert.equal(await send("local-default"), "local-default\r\n", "line endings must be learned independently for each session");
+  const localSession = fixture.sessions.find(session => session.id === "local-session");
+  localSession.records.push({
+    sequence: Math.max(...localSession.records.map(record => record.sequence)) + 1,
+    time: "2026-11-16T07:02:04.456Z", kind: "RX", data: Buffer.from("local line-feed\n").toString("base64"),
+  });
+  await page.waitForFunction(() => document.querySelector("[data-log]").textContent.includes("local line-feed"));
+  await page.getByRole("button", { name: "关闭串口", exact: true }).click();
+  await page.waitForFunction(() => document.querySelector("[data-session-status]").textContent === "未连接");
+  await page.locator("[data-port-picker-toggle]").click();
+  await page.locator('[data-port-option][data-path="/dev/local-fixture"]').first().click();
+  await page.locator("[data-connect-submit]").click();
+  await page.waitForFunction(() => document.querySelector("[data-session-status]").textContent === "监听中");
+  assert.equal(await send("reopened-default"), "reopened-default\r\n", "reopening the same session ID must reset learned line endings");
   await page.getByRole("button", { name: "关闭串口", exact: true }).click();
   await page.waitForFunction(() => document.querySelector("[data-session-status]").textContent === "未连接");
 
@@ -231,10 +371,30 @@ async function checkFunctional(page, browserName) {
       await page.screenshot({ path: path.join(output, `${browserName}-${screen}-${viewport.width}.png`) });
     }
   }
+  await page.locator("[data-settings-open]").click();
+  await page.locator("[data-preference=fontSize]").selectOption("18");
+  await page.locator("[data-preference=theme]").selectOption("dark");
+  await page.locator("[data-settings-close]").click();
+  await page.locator("[data-settings-dialog]").waitFor({ state: "hidden" });
+  await page.locator("[data-nav=monitor]").click();
+  await settleMotion(page);
+  assert.ok(await page.evaluate(() => {
+    const title = document.querySelector(".lp-monitor-title").getBoundingClientRect();
+    return [...document.querySelectorAll(".lp-monitor-actions button, [data-port-picker-toggle]")].every(node => {
+      const bounds = node.getBoundingClientRect();
+      return Math.abs((bounds.top + bounds.bottom - title.top - title.bottom) / 2) < 3;
+    });
+  }), "large-font desktop monitoring controls must remain in one row");
+  await page.screenshot({ path: path.join(output, `${browserName}-monitor-large-font.png`) });
+  await page.locator("[data-settings-open]").click();
+  await page.locator("[data-preference=fontSize]").selectOption("13");
+  await page.locator("[data-preference=theme]").selectOption("light");
+  await page.locator("[data-settings-close]").click();
+  await page.locator("[data-settings-dialog]").waitFor({ state: "hidden" });
   await page.locator("[data-nav=connect]").click();
   await page.getByRole("button", { name: "断开 Test serial fixture", exact: true }).click();
   await page.waitForFunction(() => document.querySelectorAll("[data-mapping]").length === 0);
-  assert.equal(sent.length, 1);
+  assert.equal(sent.length, 6);
   assert.deepEqual(errors, []);
   await page.screenshot({ path: path.join(output, `${browserName}-connections.png`) });
 }
@@ -276,6 +436,11 @@ async function checkEmptyLayout(page, browserName) {
     assert.equal(layout.overflow, false);
   }
   assert.deepEqual(errors, []);
+  await page.locator("[data-nav=monitor]").click();
+  await page.locator("[data-port-picker-toggle]").click();
+  assert.equal(await page.locator("[data-port-picker]").isVisible(), true);
+  await page.keyboard.press("Escape");
+  assert.equal(await page.locator("[data-port-picker]").isVisible(), false);
   await page.screenshot({ path: path.join(output, `${browserName}-empty.png`) });
 }
 
@@ -341,6 +506,7 @@ async function checkDeviceManagement(page, browserName) {
   });
   await page.goto(origin, { waitUntil: "networkidle" });
   await page.locator("[data-device-manager-open]").first().click();
+  await checkCloseFrame(page, "[data-devices-close]");
   await page.waitForFunction(() => document.querySelector("[data-device-id]").textContent.length === 64);
   assert.equal(await page.locator("[data-device-id]").textContent(), id);
   assert.equal(await page.locator("[data-device-id-short]").textContent(), "aaaaaaaaaa…aaaaaa");

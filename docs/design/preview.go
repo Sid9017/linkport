@@ -16,6 +16,9 @@ var fragment string
 //go:embed assets/live.js
 var liveScript string
 
+//go:embed assets/monitor.js
+var monitorScript string
+
 //go:embed assets/fonts
 var assets embed.FS
 
@@ -73,6 +76,7 @@ func newHandler(readSource func() (string, error), desktop bool, token string) h
 			_, _ = writer.Write([]byte(`<script type="module" src="/wails/runtime.js"></script>`))
 		}
 		_, _ = writer.Write([]byte(`</head><body>`))
+		_, _ = fmt.Fprintf(writer, "<script>%s</script>", monitorScript)
 		if desktop {
 			_, _ = fmt.Fprintf(writer, "<script>%s</script>", liveScript)
 		}

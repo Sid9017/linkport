@@ -1,4 +1,4 @@
-globalThis.initializeLinkportLive = (root, request, motion) => {
+globalThis.initializeLinkportLive = (root, request, motion, monitor) => {
   const find = selector => root.querySelector(selector);
   const all = selector => [...root.querySelectorAll(selector)];
   const platform = document.querySelector('meta[name="linkport-host-platform"]')?.content;
@@ -12,7 +12,12 @@ globalThis.initializeLinkportLive = (root, request, motion) => {
   let shareSignature = "";
   let mappingSignature = "";
   let logSignature = "";
-  let localInventorySignature = "";
+  let logSession = null;
+  let followLog = true;
+  let lastLogScroll = 0;
+  let lastLogSequence = 0;
+  let unreadLogRecords = 0;
+  let localTargetUnavailable = false;
   let routes = [];
   let scrollFrame = 0;
   const expanded = new Map();
@@ -26,8 +31,6 @@ globalThis.initializeLinkportLive = (root, request, motion) => {
   root.classList.add("lp-live");
   find(".lp-window").setAttribute("aria-label", "Linkport");
   find(".lp-preview-label").hidden = true;
-  find("[data-local-monitor-open]").hidden = false;
-  find("[data-action=disconnect]").hidden = false;
   find(".lp-devices").replaceChildren();
   find(".lp-sharelist").replaceChildren();
   find("[data-mappings]").replaceChildren();
@@ -73,8 +76,11 @@ globalThis.initializeLinkportLive = (root, request, motion) => {
   }
   function positionToast() {
     const commandbar = find(".lp-commandbar");
-    const offset = commandbar.getClientRects().length ? window.innerHeight - commandbar.getBoundingClientRect().top + 12 : 20;
+    const latest = find("[data-log-latest]");
+    const extra = latest.getClientRects().length ? latest.getBoundingClientRect().height + 8 : 0;
+    const offset = commandbar.getClientRects().length ? window.innerHeight - commandbar.getBoundingClientRect().top + 12 + extra : 20;
     find("[data-live-toast]").style.bottom = offset + "px";
+    find(".lp-terminal").style.setProperty("--lp-command-height", commandbar.getBoundingClientRect().height + "px");
   }
   const key = (nodeID, portID) => JSON.stringify([nodeID, portID]);
   const active = () => state.sessions.filter(session => session.connected && !session.local);
@@ -89,7 +95,6 @@ globalThis.initializeLinkportLive = (root, request, motion) => {
   function openConnection(device, port) {
     pendingTarget = { nodeID: device.id, portID: port.id };
     find("#lp-connect-title").textContent = "连接串口";
-    find("[data-local-monitor-field]").hidden = true;
     find("[data-connect-target]").hidden = false;
     find("[data-windows-pair]").hidden = !windows;
     for (const input of find("[data-windows-pair]").querySelectorAll("input")) input.disabled = !windows;
@@ -100,39 +105,34 @@ globalThis.initializeLinkportLive = (root, request, motion) => {
     form.elements.baudRate.value = "115200";
     motion.openDialog(dialog);
   }
-  function renderLocalPicker() {
-    const signature = JSON.stringify(state.localPorts.map(port => [port.id, port.path, port.product]));
-    if (signature === localInventorySignature) return;
-    localInventorySignature = signature;
-    const picker = form.elements.localPort;
-    const selectedPath = picker.value;
-    picker.replaceChildren();
-    for (const port of state.localPorts) {
-      const option = element("option", "", port.product ? port.product + " · " + port.path : port.path);
-      option.value = port.path;
-      option.dataset.id = port.id;
-      picker.append(option);
+  function updateLocalTarget() {
+    if (!pendingTarget?.local || !dialog.open) return;
+    const available = state.localPorts.some(port => port.id === pendingTarget.id && port.path === pendingTarget.path);
+    if (!available) {
+      localTargetUnavailable = true;
+      find("[data-connect-submit]").disabled = true;
+      find("[data-connect-error]").textContent = "所选串口已离线";
+    } else if (localTargetUnavailable) {
+      localTargetUnavailable = false;
+      find("[data-connect-submit]").disabled = false;
+      find("[data-connect-error]").textContent = "";
     }
-    if (!state.localPorts.length) picker.append(element("option", "", "未检测到串口"));
-    picker.disabled = !state.localPorts.length;
-    if ([...picker.options].some(option => option.value === selectedPath)) picker.value = selectedPath;
-    if (pendingTarget?.local) find("[data-connect-submit]").disabled = !state.localPorts.length;
   }
-  function openLocalMonitor() {
-    pendingTarget = { local: true };
+  function openLocalMonitor(port) {
+    pendingTarget = { local: true, id: port.id, path: port.path };
+    localTargetUnavailable = false;
     find("#lp-connect-title").textContent = "监听本机串口";
-    find("[data-local-monitor-field]").hidden = false;
-    find("[data-connect-target]").hidden = true;
+    find("[data-connect-target]").hidden = false;
+    find("[data-connect-target]").textContent = "本机 / " + port.path;
     find("[data-windows-pair]").hidden = true;
     for (const input of find("[data-windows-pair]").querySelectorAll("input")) input.disabled = true;
     find("[data-connect-error]").textContent = "";
     find("[data-connect-submit]").textContent = "开始监听";
     find("[data-connect-submit]").disabled = !state.localPorts.length;
     form.elements.baudRate.value = "115200";
-    renderLocalPicker();
     motion.openDialog(dialog);
+    updateLocalTarget();
   }
-  find("[data-local-monitor-open]").addEventListener("click", openLocalMonitor);
   for (const cancel of all("[data-connect-cancel]")) cancel.addEventListener("click", () => motion.closeDialog(dialog));
   form.addEventListener("submit", async event => {
     event.preventDefault();
@@ -142,21 +142,25 @@ globalThis.initializeLinkportLive = (root, request, motion) => {
     submit.textContent = pendingTarget.local ? "正在打开" : "正在连接";
     find("[data-connect-error]").textContent = "";
     try {
-      const selectedPort = form.elements.localPort.selectedOptions[0];
       const session = pendingTarget.local ? await request("monitor/local", "POST", {
-        id: selectedPort?.dataset.id || "", path: selectedPort?.value || "", baudRate: Number(form.elements.baudRate.value)
+        id: pendingTarget.id, path: pendingTarget.path, baudRate: Number(form.elements.baudRate.value)
       }) : await request("connect", "POST", {
         ...pendingTarget, baudRate: Number(form.elements.baudRate.value),
         path: windows ? form.elements.path.value.trim() : "",
         pairDevice: windows ? form.elements.pairDevice.value.trim() : ""
       });
       selected = session.id;
+      monitor.resetSession(session.id, session.records || []);
+      paused.delete(session.id);
+      sequences.delete(session.id);
+      logSignature = "";
+      logSession = null;
       motion.closeDialog(dialog);
       await refresh();
     } catch (error) {
       find("[data-connect-error]").textContent = error.message;
     } finally {
-      submit.disabled = Boolean(pendingTarget?.local && !state.localPorts.length);
+      submit.disabled = Boolean(pendingTarget?.local && !state.localPorts.some(port => port.id === pendingTarget.id && port.path === pendingTarget.path));
       submit.textContent = pendingTarget?.local ? "开始监听" : "连接";
     }
   });
@@ -217,7 +221,9 @@ globalThis.initializeLinkportLive = (root, request, motion) => {
           if (port.ambiguous) attributes.push("串口身份不明确");
           else if (!port.online) attributes.push("设备离线");
           if (attributes.length) details.append(element("span", "lp-caption", attributes.join(" · ")));
-          row.append(icon("port", "lp-porticon"), details);
+          const portIcon = monitor.icon(port);
+          portIcon.classList.add("lp-porticon");
+          row.append(portIcon, details);
           if (session) row.append(element("span", "lp-connected", "已连接"));
           const control = button(session ? "disconnect" : "link", (session ? "断开 " : "连接 ") + title,
             () => session ? disconnect(session) : openConnection(device, port), !session);
@@ -285,7 +291,7 @@ globalThis.initializeLinkportLive = (root, request, motion) => {
           } finally { checkbox.disabled = Boolean(port.ambiguous && !port.shared); }
         });
         label.append(checkbox);
-        row.append(icon("port"), details, label);
+        row.append(monitor.icon(port), details, label);
         list.append(row);
       }
     }
@@ -313,61 +319,103 @@ globalThis.initializeLinkportLive = (root, request, motion) => {
           button("disconnect", "断开 " + session.hostName + " / " + session.portPath, () => disconnect(session)));
         list.append(row);
       }
-      const picker = find("[data-session-select]");
-      picker.replaceChildren();
-      const orderedSessions = [...state.sessions].sort((first, second) => Number(Boolean(second.local)) - Number(Boolean(first.local)));
-      for (const session of orderedSessions) {
-        const option = element("option", "", (session.local ? "本机" : session.hostName) + " / " + session.portPath + (session.connected ? "" : " · 已断开"));
-        option.value = session.id;
-        picker.append(option);
-      }
-      if (!state.sessions.length) picker.append(element("option", "", "暂无会话"));
-      picker.disabled = !state.sessions.length;
       drawCurves();
     }
     if (!state.sessions.some(session => session.id === selected)) selected = state.sessions[0]?.id || null;
-    if (selected) find("[data-session-select]").value = selected;
     find("[data-connection-count]").textContent = sessions.length + " 条连接";
     find(".lp-mapping-heading").hidden = !sessions.length;
     find("[data-mappings]").hidden = !sessions.length;
   }
+  function renderMonitorPorts() {
+    const entries = [];
+    for (const port of state.localPorts) {
+      const session = state.sessions.find(item => item.local && item.connected && item.portPath === port.path);
+      entries.push({ key: key("local", port.id), group: "本机", label: port.product || port.path, path: port.path,
+        title: "本机 / " + port.path, port, local: true, sessionID: session?.id, connected: Boolean(session) });
+    }
+    for (const device of state.devices) {
+      if (device.service !== "available" || !device.bridge) continue;
+      for (const port of device.ports) {
+        if (!port.online || port.ambiguous) continue;
+        const session = matching(device.id, port.id);
+        entries.push({ key: key(device.id, port.id), group: device.hostName, label: port.product || port.path, path: port.path,
+          title: device.hostName + " / " + port.path, port, device, sessionID: session?.id, connected: Boolean(session) });
+      }
+    }
+    for (const session of state.sessions) {
+      if (entries.some(entry => entry.sessionID === session.id)) continue;
+      const metadata = session.local ? state.localPorts.find(port => port.path === session.portPath) :
+        state.devices.find(device => device.id === session.nodeID)?.ports?.find(port => port.id === session.portID);
+      entries.push({ key: key("session", session.id), group: "最近会话", label: (session.local ? "本机" : session.hostName) + " / " + session.portPath,
+        path: session.portPath, port: metadata || session, sessionID: session.id, connected: session.connected });
+    }
+    const selectedEntry = entries.find(entry => entry.sessionID === selected);
+    monitor.setPorts(entries, selectedEntry?.key, entry => {
+      if (entry.sessionID) {
+        selected = entry.sessionID;
+        renderMonitorPorts();
+        renderLog(true);
+      } else if (entry.local) openLocalMonitor(entry.port);
+      else openConnection(entry.device, entry.port);
+    });
+  }
   function renderLog(force = false) {
     const session = currentSession();
+    const changedSession = logSession !== selected;
+    if (changedSession) {
+      logSession = selected;
+      followLog = true;
+      lastLogScroll = 0;
+      lastLogSequence = 0;
+      unreadLogRecords = 0;
+    }
+    const visible = log.getClientRects().length > 0;
+    if (visible && !changedSession) {
+      lastLogScroll = log.scrollTop;
+      followLog = log.scrollHeight - log.scrollTop - log.clientHeight < 24;
+    }
+    const incoming = (session?.records || []).filter(record => record.sequence > lastLogSequence && ["RX", "TX"].includes(record.kind)).length;
+    if (!changedSession && incoming && !paused.has(selected) && (!followLog || monitor.isSearching())) unreadLogRecords += incoming;
+    lastLogSequence = Math.max(lastLogSequence, session?.records.at(-1)?.sequence || 0);
     const records = paused.has(selected) ? paused.get(selected) : session?.records || [];
-    const signature = JSON.stringify([selected, records, find("[data-format]").value, find("[data-filter]").value]);
+    const signature = JSON.stringify([selected, records, find("[data-hex]").checked]);
+    if (session) monitor.lineEnding(session.id, session.records || []);
     if (force || signature !== logSignature) {
       logSignature = signature;
-      const follow = log.scrollHeight - log.scrollTop - log.clientHeight < 24;
-      const previousScroll = log.scrollTop;
       log.replaceChildren();
-      const keyword = find("[data-filter]").value.toLowerCase();
-      const showHex = find("[data-format]").value === "hex";
+      const showHex = find("[data-hex]").checked;
       const textDecoders = { RX: new TextDecoder(), TX: new TextDecoder() };
       for (const record of records) {
         const content = bytes(record);
         const decoded = record.message || textDecoders[record.kind]?.decode(content, { stream: true }) || "";
         const message = showHex && record.kind !== "SYS" ? hex(content) : decoded.replace(/\r/g, "\\r").replace(/\n/g, "\\n");
-        if (keyword && !(record.kind + " " + message).toLowerCase().includes(keyword)) continue;
         const row = element("div", "lp-logline");
         row.dataset.kind = record.kind;
+        row.dataset.recordKey = selected + ":" + record.sequence;
         row.append(element("time", "", time(record.time)), element("span", "lp-direction", record.kind), element("span", "lp-message", message));
         log.append(row);
       }
-      log.classList.toggle("lp-log-empty", !session && !keyword);
+      log.classList.toggle("lp-log-empty", !session);
       if (!log.childElementCount) {
-        const empty = element("div", "lp-empty" + (!session ? " lp-monitor-empty" : ""), keyword ? "没有匹配的日志" : session ? "暂无日志，等待此会话的数据" : "选择一个串口开始监听");
-        if (!session && !keyword) {
-          const open = element("button", "lp-primary", "监听本机串口");
+        const empty = element("div", "lp-empty" + (!session ? " lp-monitor-empty" : ""), session ? "暂无日志，等待此会话的数据" : "选择一个串口开始监听");
+        if (!session) {
+          const open = element("button", "lp-primary", "选择串口");
           open.type = "button";
-          open.addEventListener("click", openLocalMonitor);
+          open.addEventListener("click", monitor.openPicker);
           empty.append(open);
         }
         log.append(empty);
       }
-      log.scrollTop = follow || force ? log.scrollHeight : previousScroll;
+      const latest = !monitor.isSearching() && (followLog || force || changedSession);
+      if (latest) unreadLogRecords = 0;
+      if (visible) log.scrollTop = latest ? log.scrollHeight : lastLogScroll;
+      followLog = latest;
+      monitor.refreshSearch(force, force && monitor.isSearching());
     }
-    find("[data-session-label]").textContent = session ? (session.local ? "本机" : session.hostName) + " / " + session.portPath : "暂无会话";
+    find("[data-log-latest]").hidden = !unreadLogRecords || paused.has(selected);
+    find("[data-new-record-count]").textContent = String(unreadLogRecords);
     const status = find("[data-session-status]");
+    status.hidden = !session;
     status.textContent = session?.connected ? (paused.has(selected) ? "显示已暂停" : "监听中") : "未连接";
     status.title = session?.error || "";
     find("[data-send]").disabled = !session?.connected;
@@ -376,9 +424,9 @@ globalThis.initializeLinkportLive = (root, request, motion) => {
     for (const action of ["pause", "clear", "export"]) find("[data-action=" + action + "]").disabled = !session;
     const pause = find("[data-action=pause]");
     pause.setAttribute("aria-label", paused.has(selected) ? "继续显示" : "暂停显示");
-    pause.querySelector("use").setAttribute("href", paused.has(selected) ? "#lp-icon-play" : "#lp-icon-pause");
+    pause.querySelector("use").setAttribute("href", paused.has(selected) ? "#lp-icon-monitor-play" : "#lp-icon-monitor-pause");
     find("[data-action=export]").setAttribute("aria-label", "导出完整会话");
-    find("[data-action=export]").title = "导出当前会话全部缓冲日志，包含筛选隐藏的内容";
+    find("[data-action=export]").title = "导出当前会话全部缓冲日志";
   }
   function render() {
     const network = state.network;
@@ -398,8 +446,9 @@ globalThis.initializeLinkportLive = (root, request, motion) => {
     find("[data-live-add]").textContent = "添加设备";
     renderDevices();
     renderSharing();
-    renderLocalPicker();
+    updateLocalTarget();
     renderMappings();
+    renderMonitorPorts();
     renderLog();
     for (const refresh of all("[data-refresh]")) {
       refresh.dataset.refreshing = String(Boolean(state.refreshing));
@@ -493,17 +542,30 @@ globalThis.initializeLinkportLive = (root, request, motion) => {
     try { await request("refresh", "POST"); await refresh(); }
     catch (error) { toast(error.message); }
   });
-  find("[data-session-select]").addEventListener("change", event => {
-    selected = event.target.value;
-    renderLog(true);
-    motion.enter(find("[data-session-label]"));
-  });
   find("[data-action=disconnect]").addEventListener("click", () => {
     const session = currentSession();
     if (session) disconnect(session);
   });
-  find("[data-filter]").addEventListener("input", () => renderLog());
-  find("[data-format]").addEventListener("change", () => renderLog());
+  find("[data-hex]").addEventListener("change", () => renderLog());
+  log.addEventListener("scroll", () => {
+    if (!log.getClientRects().length) return;
+    lastLogScroll = log.scrollTop;
+    followLog = log.scrollHeight - log.scrollTop - log.clientHeight < 24;
+    if (followLog) {
+      unreadLogRecords = 0;
+      find("[data-log-latest]").hidden = true;
+    }
+  }, { passive: true });
+  root.addEventListener("linkport:screen", event => {
+    if (event.detail !== "monitor") return;
+    log.scrollTop = followLog && !monitor.isSearching() ? log.scrollHeight : lastLogScroll;
+  });
+  find("[data-log-latest]").addEventListener("click", () => {
+    monitor.closeSearch(false);
+    unreadLogRecords = 0;
+    followLog = true;
+    renderLog(true);
+  });
   find("[data-action=pause]").addEventListener("click", () => {
     if (paused.has(selected)) paused.delete(selected);
     else paused.set(selected, [...(currentSession()?.records || [])]);
@@ -513,6 +575,9 @@ globalThis.initializeLinkportLive = (root, request, motion) => {
     try {
       await request("clear", "POST", { id: selected });
       if (paused.has(selected)) paused.set(selected, []);
+      unreadLogRecords = 0;
+      followLog = true;
+      log.scrollTop = log.scrollHeight;
       await refresh();
     } catch (error) { toast(error.message); }
   });
@@ -526,8 +591,10 @@ globalThis.initializeLinkportLive = (root, request, motion) => {
     event.preventDefault();
     const input = event.currentTarget.elements.command;
     if (!input.value || !currentSession()?.connected) return;
-    const endings = { none: "", cr: "\r", lf: "\n", crlf: "\r\n" };
-    const content = new TextEncoder().encode(input.value + endings[event.currentTarget.elements.ending.value]);
+    const session = currentSession();
+    const ending = monitor.lineEnding(session.id, session.records || []);
+    const command = /[\r\n]$/.test(input.value) ? input.value : input.value + ending;
+    const content = new TextEncoder().encode(command);
     if (content.length > 65536) { toast("发送内容不能超过 65536 字节"); return; }
     const identity = selected;
     const original = input.value;
@@ -541,16 +608,18 @@ globalThis.initializeLinkportLive = (root, request, motion) => {
     } catch (error) { toast(error.message); }
     finally { find("[data-send]").disabled = !currentSession()?.connected; }
   });
-  const observer = new ResizeObserver(() => { drawCurves(); positionToast(); });
+  const observer = new ResizeObserver(drawCurves);
+  const commandObserver = new ResizeObserver(positionToast);
   find(".lp-devices").addEventListener("scroll", () => {
     if (!scrollFrame) scrollFrame = requestAnimationFrame(() => { scrollFrame = 0; drawCurves(); });
   });
   for (const node of all(".lp-topology, .lp-local, .lp-devices")) observer.observe(node);
-  observer.observe(find(".lp-commandbar"));
+  commandObserver.observe(find(".lp-commandbar"));
+  commandObserver.observe(find("[data-log-latest]"));
   document.fonts.ready.then(drawCurves);
   render();
   refresh();
   const interval = setInterval(refresh, 1000);
-  window.addEventListener("pagehide", () => { clearInterval(interval); observer.disconnect(); cancelAnimationFrame(scrollFrame); }, { once: true });
+  window.addEventListener("pagehide", () => { clearInterval(interval); observer.disconnect(); commandObserver.disconnect(); cancelAnimationFrame(scrollFrame); }, { once: true });
   return drawCurves;
 };

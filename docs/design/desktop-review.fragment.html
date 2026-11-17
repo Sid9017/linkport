@@ -105,19 +105,38 @@
 #linkport-review .lp-mapping-source span { display: block; color: var(--lp-muted); font-size: calc(11px * var(--lp-font-scale)); }
 #linkport-review .lp-mapping-heading { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 0; padding-bottom: 12px; border-bottom: 1px solid var(--lp-line); }
 #linkport-review .lp-mapping-heading h2 { font-size: calc(13px * var(--lp-font-scale)); font-weight: 500; }
-#linkport-review .lp-session-select { max-width: 350px; }
-#linkport-review .lp-monitor-selector { display: flex; align-items: center; gap: 8px; min-width: 0; }
-#linkport-review .lp-monitor-selector select { min-width: 0; }
+#linkport-review .lp-monitor-head { flex-wrap: wrap; gap: 10px 20px; }
+#linkport-review .lp-monitor-title { display: flex; align-items: center; gap: 14px; }
+#linkport-review .lp-hex { display: inline-flex; align-items: center; gap: 6px; color: var(--lp-muted); font: calc(11px * var(--lp-font-scale))/1.5 var(--lp-mono); }
+#linkport-review .lp-monitor-tools { display: flex; align-items: center; justify-content: flex-end; gap: 10px; flex: 1; min-width: 0; }
+#linkport-review .lp-monitor-actions { display: flex; align-items: center; gap: 2px; flex: none; }
+#linkport-review .lp-monitor-actions .lp-icon { width: 19px; height: 19px; stroke-width: 2.1; }
+#linkport-review .lp-port-picker { position: relative; min-width: 0; max-width: 350px; flex: 1; }
+#linkport-review .lp-port-picker-toggle { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; padding: 5px 9px; }
+#linkport-review .lp-port-picker-toggle > span[data-session-label] { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#linkport-review .lp-port-picker-toggle > .lp-icon:last-child { width: 13px; height: 13px; margin-left: auto; transform: rotate(90deg); }
+#linkport-review [data-selected-port-icon] { display: flex; color: var(--lp-muted); }
+#linkport-review .lp-port-menu { position: absolute; top: calc(100% + 7px); right: 0; z-index: 15; width: min(370px, calc(100vw - 100px)); max-height: min(360px, calc(100dvh - 160px)); padding: 5px; overflow: auto; scrollbar-width: thin; border: 1px solid var(--lp-line); border-radius: 8px; background: var(--lp-bg); }
+#linkport-review .lp-port-group { padding: 8px 9px 5px; color: var(--lp-muted); font-size: calc(11px * var(--lp-font-scale)); }
+#linkport-review .lp-port-menu .lp-port-option { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; text-align: left; padding: 8px 9px; white-space: normal; }
+#linkport-review .lp-port-option > .lp-icon { color: var(--lp-muted); width: 17px; height: 17px; }
+#linkport-review .lp-port-option[aria-selected="true"] { background: var(--lp-tint); }
+#linkport-review .lp-port-option-text { min-width: 0; display: grid; gap: 2px; flex: 1; overflow-wrap: anywhere; }
+#linkport-review .lp-port-option-text code { color: var(--lp-muted); font-size: calc(10.5px * var(--lp-font-scale)); }
+#linkport-review .lp-port-connected { color: var(--lp-muted); font-size: 8px; }
 #linkport-review .lp-loglines.lp-log-empty { display: grid; place-items: center; }
 #linkport-review .lp-monitor-empty { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 24px; }
-#linkport-review .lp-local-port-picker { display: grid; gap: 8px; margin: 12px 0; }
-#linkport-review .lp-local-port-picker select { width: 100%; min-height: 34px; }
-#linkport-review .lp-terminal { border: 1px solid var(--lp-line); border-radius: 6px; overflow: hidden; min-height: 0; display: flex; flex-direction: column; flex: 1; }
-#linkport-review .lp-termhead { padding: 8px 11px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; border-bottom: 1px solid var(--lp-line); }
-#linkport-review .lp-termhead strong { font-weight: 600; }
-#linkport-review .lp-termhead .lp-inline { margin-left: auto; gap: 5px; }
+#linkport-review .lp-terminal { position: relative; border: 1px solid var(--lp-line); border-radius: 6px; overflow: hidden; min-height: 0; display: flex; flex-direction: column; flex: 1; }
+#linkport-review .lp-log-latest { position: absolute; right: 14px; bottom: calc(var(--lp-command-height, 52px) + 10px); z-index: 5; display: flex; align-items: center; gap: 6px; padding: 5px 9px; background: var(--lp-soft); font: calc(11px * var(--lp-font-scale))/1.5 var(--lp-mono); }
+#linkport-review .lp-log-latest .lp-icon { width: 14px; height: 14px; }
+#linkport-review .lp-logsearch { display: flex; align-items: center; gap: 5px; padding: 7px 10px; background: var(--lp-soft); border-bottom: 1px solid var(--lp-line); flex: none; }
+#linkport-review .lp-logsearch > .lp-icon { color: var(--lp-muted); width: 16px; height: 16px; }
+#linkport-review .lp-logsearch input { min-width: 0; flex: 1; border: 0; outline: none; padding: 4px; background: transparent; color: var(--lp-text); font: inherit; }
+#linkport-review .lp-logsearch .lp-iconbutton { width: 27px; height: 27px; }
+#linkport-review [data-search-count] { min-width: 40px; color: var(--lp-muted); font: calc(11px * var(--lp-font-scale))/1.5 var(--lp-mono); text-align: center; }
+#linkport-review .lp-logsearch .lp-iconbutton[data-search-close] { outline: none; border: 0; box-shadow: none; }
+#linkport-review .lp-logsearch .lp-iconbutton[data-search-close]:focus-visible { background: var(--lp-tint); }
 #linkport-review input[type="checkbox"] { accent-color: var(--lp-accent); width: 14px; height: 14px; margin: 0; }
-#linkport-review .lp-filter { min-width: 90px; width: 150px; padding: 6px 9px; border: 1px solid var(--lp-line); border-radius: 6px; background: var(--lp-bg); outline-offset: 1px; }
 #linkport-review .lp-loglines { padding: 12px 14px; min-height: 72px; flex: 1; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--lp-line) transparent; }
 #linkport-review .lp-logline { display: grid; grid-template-columns: 12ch 3ch minmax(0, 1fr); gap: 12px; font: calc(12px * var(--lp-font-scale))/1.9 var(--lp-mono); font-variant-numeric: tabular-nums; }
 #linkport-review .lp-logline time { color: var(--lp-muted); }
@@ -125,10 +144,11 @@
 #linkport-review .lp-logline[data-kind="SYS"] .lp-message { color: var(--lp-muted); }
 #linkport-review .lp-logline[data-kind="TX"] .lp-direction { color: var(--lp-secondary); }
 #linkport-review .lp-message { overflow-wrap: anywhere; white-space: pre-wrap; }
+#linkport-review .lp-logline mark { color: inherit; background: var(--lp-tint); border-radius: 2px; }
+#linkport-review .lp-logline[data-search-current="true"] { background: var(--lp-soft); border-radius: 3px; }
+#linkport-review .lp-logline[data-search-current="true"] mark { background: var(--lp-text); color: var(--lp-bg); }
 #linkport-review .lp-empty { padding: 35px 0; text-align: center; color: var(--lp-muted); font-size: 12px; }
 #linkport-review .lp-commandbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 13px; border-top: 1px solid var(--lp-line); }
-#linkport-review .lp-logcontrols { display: flex; align-items: center; gap: 8px; min-width: 0; padding-right: 8px; border-right: 1px solid var(--lp-line); }
-#linkport-review .lp-logcontrols .lp-filter { flex: 0 1 150px; min-width: 90px; }
 #linkport-review .lp-commandbar select, #linkport-review .lp-commandbar input { min-height: 31px; }
 #linkport-review .lp-send { display: flex; align-items: center; gap: 8px; flex: 1 1 260px; flex-wrap: wrap; min-width: 0; }
 #linkport-review .lp-send input { flex: 1; width: 100px; min-width: 100px; border: 1px solid var(--lp-line); border-radius: 6px; background: var(--lp-bg); padding: 6px 9px; font-family: var(--lp-mono); caret-color: var(--lp-accent); }
@@ -141,7 +161,7 @@
 #linkport-review .lp-sharing { color: var(--lp-secondary); }
 #linkport-review .lp-sharepanel .lp-portdesc strong { font-weight: 500; }
 #linkport-review .lp-monitor { display: flex; flex-direction: column; overflow: hidden; }
-#linkport-review .lp-termhead, #linkport-review .lp-commandbar { flex: none; }
+#linkport-review .lp-commandbar { flex: none; }
 #linkport-review .lp-pluginempty { padding: 110px 20px; text-align: center; color: var(--lp-muted); }
 #linkport-review .lp-pluginempty svg { width: 34px; height: 34px; color: var(--lp-accent); margin-bottom: 15px; }
 #linkport-review .lp-pluginempty strong { display: block; color: var(--lp-text); font-size: 14px; font-weight: 500; margin-bottom: 7px; }
@@ -179,6 +199,8 @@
 #linkport-review .lp-settings-head { display: flex; align-items: center; justify-content: space-between; min-height: 54px; padding: 10px 20px; border-bottom: 1px solid var(--lp-line); flex: none; }
 #linkport-review .lp-settings-head h2 { font-size: calc(15px * var(--lp-font-scale)); }
 #linkport-review .lp-settings-head .lp-iconbutton::after { display: none; }
+#linkport-review .lp-settings-head .lp-iconbutton { border: 0; outline: none; box-shadow: none; background: transparent; }
+#linkport-review .lp-settings-head .lp-iconbutton:hover, #linkport-review .lp-settings-head .lp-iconbutton:focus-visible { background: var(--lp-tint); outline: none; box-shadow: none; }
 #linkport-review .lp-settings-body { padding: 0 20px; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
 #linkport-review .lp-setting { display: flex; align-items: center; justify-content: space-between; gap: 20px; min-height: 42px; padding: 6px 0; }
 #linkport-review .lp-setting > span { min-width: 0; }
@@ -194,6 +216,7 @@
 #linkport-review .lp-connect-form { padding: 12px 20px 20px; overflow: auto; }
 #linkport-review .lp-connect-form input { width: 150px; min-height: 30px; border: 1px solid var(--lp-line); border-radius: 6px; background: var(--lp-bg); padding: 4px 8px; }
 #linkport-review .lp-connect-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+#linkport-review [data-connect-target] { overflow-wrap: anywhere; font-family: var(--lp-mono); }
 #linkport-review [data-service-status] { margin-bottom: 12px; overflow-wrap: anywhere; }
 #linkport-review .lp-switch { appearance: none; flex: none; width: 28px !important; height: 17px !important; border-radius: 10px; background: var(--lp-line); position: relative; cursor: pointer; transition: background-color 140ms; }
 #linkport-review .lp-switch::after { content: ""; position: absolute; width: 13px; height: 13px; left: 2px; top: 2px; border-radius: 50%; background: var(--lp-bg); transition: transform 140ms; }
@@ -234,12 +257,11 @@
   #linkport-review .lp-machine .lp-right { flex-basis: 100%; text-align: left; padding-left: 13px; }
   #linkport-review .lp-connected { display: none; }
   #linkport-review .lp-sectionhead .lp-inline { gap: 2px 10px; }
-  #linkport-review .lp-logcontrols { width: 100%; border-right: 0; padding-right: 0; }
-  #linkport-review .lp-logcontrols .lp-filter { flex: 1; width: 0; }
   #linkport-review .lp-send { flex-basis: 100%; gap: 6px; }
   #linkport-review .lp-send input { min-width: 0; width: 0; }
-  #linkport-review .lp-termhead { gap: 4px; }
-  #linkport-review .lp-session-select { max-width: 100%; }
+  #linkport-review .lp-monitor-title { gap: 10px; }
+  #linkport-review .lp-monitor-tools { flex-basis: 100%; }
+  #linkport-review .lp-port-menu { left: 0; right: auto; }
   #linkport-review .lp-settings-head { padding: 10px 16px; }
   #linkport-review .lp-settings-body { padding: 0 16px; }
   #linkport-review .lp-setting { gap: 12px; }
@@ -249,7 +271,6 @@
   #linkport-review .lp-shareitem { flex-wrap: wrap; }
   #linkport-review .lp-sharelabel { margin-left: auto; }
   #linkport-review .lp-caption { font-size: 11px; }
-  #linkport-review .lp-termhead .lp-inline { margin-left: 0; }
 }
 @media (pointer: coarse) {
   #linkport-review button, #linkport-review select, #linkport-review .lp-checkbox, #linkport-review .lp-sharelabel { min-height: 44px; }
@@ -302,6 +323,17 @@
     <symbol id="lp-icon-machine" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M9 21h6m-3-4v4"/><path d="M6 8h3m-3 3h5" opacity=".65"/></symbol>
     <symbol id="lp-icon-port" viewBox="0 0 24 24"><path d="M5 3h14v9l-4 5H9l-4-5zM9 17v4m6-4v4"/><path d="M9 7v3m3-3v3m3-3v3"/></symbol>
     <symbol id="lp-icon-radio" viewBox="0 0 24 24"><path d="m10 3 6 5-6 5 6 5-6 3V3zm-4 5 10 10M6 16 16 8"/></symbol>
+    <symbol id="lp-icon-bluetooth" viewBox="0 0 24 24"><path d="m7 7 10 10-5 5V2l5 5L7 17"/></symbol>
+    <symbol id="lp-icon-usb" viewBox="0 0 24 24"><path d="M12 19V3m-3 3 3-3 3 3M12 14l-6-4V7m6 10 6-4V9"/><circle cx="12" cy="20" r="2"/><circle cx="6" cy="5" r="2"/><rect x="16" y="5" width="4" height="4" rx=".5"/></symbol>
+    <symbol id="lp-icon-uart" viewBox="0 0 24 24"><rect x="6" y="5" width="12" height="14" rx="2"/><path d="M3 8h3m-3 4h3m-3 4h3m12-8h3m-3 4h3m-3 4h3M9 14v-4h3v4h3v-4"/></symbol>
+    <symbol id="lp-icon-monitor-disconnect" viewBox="0 0 24 24"><path d="M8 3v4m8-4v4M6 7h12v4a6 6 0 0 1-12 0V7m6 10v4M3 3l18 18" stroke-width="2.1"/></symbol>
+    <symbol id="lp-icon-monitor-clear" viewBox="0 0 24 24"><path d="M4 6h16M9 3h6M6 6l1 15h10l1-15M10 10v7m4-7v7" stroke-width="2.1"/></symbol>
+    <symbol id="lp-icon-monitor-pause" viewBox="0 0 24 24"><g fill="currentColor" stroke="none"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></g></symbol>
+    <symbol id="lp-icon-monitor-play" viewBox="0 0 24 24"><path d="m7 4 13 8-13 8Z" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="lp-icon-monitor-export" viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M4 16v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4" stroke-width="2.1"/></symbol>
+    <symbol id="lp-icon-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5" stroke-width="1.8"/></symbol>
+    <symbol id="lp-icon-up" viewBox="0 0 24 24"><path d="m6 15 6-6 6 6" stroke-width="2"/></symbol>
+    <symbol id="lp-icon-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6" stroke-width="2"/></symbol>
     <symbol id="lp-icon-link" viewBox="0 0 24 24"><path d="m9 8 2-2a5 5 0 0 1 7 7l-2 2m-1 1-2 2a5 5 0 0 1-7-7l2-2m1 6 6-6"/></symbol>
     <symbol id="lp-icon-share" viewBox="0 0 24 24"><circle cx="6" cy="12" r="3"/><circle cx="18" cy="5" r="3"/><circle cx="18" cy="19" r="3"/><path d="m9 10.5 6-4m-6 7 6 4"/></symbol>
     <symbol id="lp-icon-listen" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m6 12 3 3 4-7 3 5h2"/></symbol>
@@ -408,22 +440,25 @@
         <div class="lp-connection-empty" data-connection-empty hidden><strong data-empty-title></strong><p data-empty-copy></p><button type="button" class="lp-primary" data-live-add hidden>添加设备</button></div>
       </section>
       <section class="lp-workspace lp-monitor" aria-label="串口监听" data-screen="monitor" hidden>
-        <div class="lp-sectionhead"><h2>监听</h2><div class="lp-monitor-selector"><select class="lp-session-select" data-session-select aria-label="监听会话"><option value="">暂无会话</option></select><button type="button" class="lp-iconbutton" data-local-monitor-open aria-label="监听本机串口" title="监听本机串口" hidden><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-port"/></svg></button></div></div>
-        <section class="lp-terminal" aria-label="串口日志监听">
-          <div class="lp-termhead">
-            <span class="lp-caption" data-session-label>暂无会话</span>
-            <span class="lp-badge" data-session-status>未连接</span>
-            <div class="lp-inline"><button type="button" class="lp-iconbutton" data-action="disconnect" aria-label="关闭串口" hidden><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-disconnect"/></svg></button><button type="button" class="lp-iconbutton" data-action="pause" aria-label="暂停显示"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-pause"/></svg></button><button type="button" class="lp-iconbutton" data-action="clear" aria-label="清空日志"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-clear"/></svg></button><button type="button" class="lp-iconbutton" data-action="export" aria-label="导出日志"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-export"/></svg></button></div>
-          </div>
-          <div class="lp-loglines" data-log role="log" aria-label="演示串口日志"></div>
-          <div class="lp-commandbar">
-            <div class="lp-logcontrols">
-              <select data-format aria-label="日志格式"><option value="text">文本</option><option value="hex">HEX</option></select>
-              <input class="lp-filter" type="search" placeholder="筛选日志…" aria-label="筛选串口日志" data-filter>
+        <div class="lp-sectionhead lp-monitor-head">
+          <div class="lp-monitor-title"><h2>监听</h2><label class="lp-hex"><input type="checkbox" data-hex aria-label="HEX 显示">HEX</label><span class="lp-badge" data-session-status hidden>未连接</span></div>
+          <div class="lp-monitor-tools">
+            <div class="lp-port-picker">
+              <button type="button" class="lp-port-picker-toggle" data-port-picker-toggle aria-haspopup="listbox" aria-expanded="false" aria-controls="lp-monitor-ports"><span data-selected-port-icon></span><span data-session-label>选择串口</span><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-chevron"/></svg></button>
+              <div id="lp-monitor-ports" class="lp-port-menu" data-port-picker role="listbox" aria-label="可连接的串口" hidden></div>
             </div>
+            <div class="lp-monitor-actions"><button type="button" class="lp-iconbutton" data-action="disconnect" aria-label="关闭串口"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-monitor-disconnect"/></svg></button><button type="button" class="lp-iconbutton" data-action="clear" aria-label="清空日志"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-monitor-clear"/></svg></button><button type="button" class="lp-iconbutton" data-action="pause" aria-label="暂停显示"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-monitor-pause"/></svg></button><button type="button" class="lp-iconbutton" data-action="export" aria-label="导出日志"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-monitor-export"/></svg></button></div>
+          </div>
+        </div>
+        <section class="lp-terminal" aria-label="串口日志监听">
+          <div class="lp-logsearch" data-log-search role="search" hidden>
+            <svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-search"/></svg><input type="search" data-log-query aria-label="搜索日志" placeholder="搜索日志" autocomplete="off" spellcheck="false"><span data-search-count role="status">0/0</span><button type="button" class="lp-iconbutton" data-search-prev aria-label="上一个匹配行"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-up"/></svg></button><button type="button" class="lp-iconbutton" data-search-next aria-label="下一个匹配行"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-down"/></svg></button><button type="button" class="lp-iconbutton" data-search-close aria-label="关闭日志搜索"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-close"/></svg></button>
+          </div>
+          <div class="lp-loglines" data-log role="log" aria-label="演示串口日志" tabindex="0"></div>
+          <button type="button" class="lp-log-latest" data-log-latest aria-label="查看最新日志" hidden><span data-new-record-count>0</span><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-down"/></svg></button>
+          <div class="lp-commandbar">
             <form class="lp-send">
               <input name="command" type="text" autocomplete="off" placeholder="输入命令…" aria-label="发送内容">
-              <select name="ending" aria-label="行尾"><option value="crlf">CRLF</option><option value="lf">LF</option><option value="cr">CR</option><option value="none">无行尾</option></select>
               <button type="submit" class="lp-iconbutton lp-primary" data-send aria-label="发送"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-send"/></svg></button>
             </form>
           </div>
@@ -504,7 +539,6 @@
     <div class="lp-settings-head"><h2 id="lp-connect-title">连接串口</h2><button type="button" class="lp-iconbutton" data-connect-cancel aria-label="关闭连接设置"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-close"/></svg></button></div>
     <form class="lp-connect-form">
       <p class="lp-caption" data-connect-target></p>
-      <label class="lp-local-port-picker" data-local-monitor-field hidden><span>本机串口</span><select name="localPort" aria-label="本机串口"></select></label>
       <label class="lp-setting"><span>波特率</span><input type="number" min="1" max="4000000" value="115200" name="baudRate" required aria-label="波特率"></label>
       <div data-windows-pair hidden>
         <label class="lp-setting"><span>本地 COM 端口</span><input name="path" placeholder="COM10" aria-label="本地 COM 端口"></label>
@@ -542,6 +576,7 @@
     const before = node.hidden ? 0 : node.getBoundingClientRect().height;
     const opacity = node.hidden ? 0 : Number(getComputedStyle(node).opacity);
     const padding = node.hidden ? "0px" : getComputedStyle(node).paddingTop;
+    const bottomPadding = node.hidden ? "0px" : getComputedStyle(node).paddingBottom;
     pending?.cancel();
     revealAnimations.delete(node);
     node.classList.remove("lp-disclosure-animating");
@@ -549,6 +584,7 @@
     node.inert = !visible;
     const height = node.getBoundingClientRect().height;
     const targetPadding = getComputedStyle(node).paddingTop;
+    const targetBottomPadding = getComputedStyle(node).paddingBottom;
     if (!animate || reducedMotion.matches || !node.getClientRects().length) {
       node.hidden = !visible;
       onLayout();
@@ -556,8 +592,8 @@
     }
     node.classList.add("lp-disclosure-animating");
     const animation = node.animate([
-      { height: before + "px", paddingTop: padding, opacity },
-      { height: (visible ? height : 0) + "px", paddingTop: visible ? targetPadding : "0px", opacity: visible ? 1 : 0 }
+      { height: before + "px", paddingTop: padding, paddingBottom: bottomPadding, opacity },
+      { height: (visible ? height : 0) + "px", paddingTop: visible ? targetPadding : "0px", paddingBottom: visible ? targetBottomPadding : "0px", opacity: visible ? 1 : 0 }
     ], { duration: visible ? 220 : 150, easing: "cubic-bezier(.2,.8,.2,1)", fill: "both" });
     revealAnimations.set(node, animation);
     animation.onfinish = () => {
@@ -626,6 +662,7 @@
     positionIndicator();
     if (previous !== name) enter(find(`[data-screen="${name}"]`));
     drawCurves();
+    root.dispatchEvent(new CustomEvent("linkport:screen", { detail: name }));
   }
   for (const button of all("[data-nav]")) button.addEventListener("click", () => showScreen(button.dataset.nav));
   const navigationObserver = new ResizeObserver(() => positionIndicator(false));
@@ -636,6 +673,7 @@
   enter(find(".lp-panels"), 7);
   window.addEventListener("pagehide", () => navigationObserver.disconnect(), { once: true });
   const motion = { enter, reveal, openDialog, closeDialog };
+  const monitor = globalThis.initializeLinkportMonitor(root, motion);
   if (!nativeDesktop) {
   for (const template of all("template[data-demo-shares], template[data-demo-devices]")) template.replaceWith(template.content.cloneNode(true));
   find("[data-host-name]").textContent = "dev-machine";
@@ -732,15 +770,14 @@
   const currentTime = () => new Date().toLocaleTimeString("en-GB", { hour12: false }) + ".000";
   function drawLogs() {
     const session = sessions.get(selectedPort);
-    const keyword = find("[data-filter]").value.toLowerCase();
-    const hex = find("[data-format]").value === "hex";
+    const hex = find("[data-hex]").checked;
     logContainer.replaceChildren();
     const records = session ? (session.paused ? session.pausedSnapshot : session.records) : [];
-    const visible = records.filter(record => (record.kind + " " + record.message).toLowerCase().includes(keyword));
-    for (const record of visible) {
+    for (const [index, record] of records.entries()) {
       const row = document.createElement("div");
       row.className = "lp-logline";
       row.dataset.kind = record.kind;
+      row.dataset.recordKey = selectedPort + ":" + index;
       const time = document.createElement("time");
       time.textContent = record.time;
       const direction = document.createElement("span");
@@ -754,13 +791,14 @@
       row.append(time, direction, message);
       logContainer.append(row);
     }
-    if (!visible.length) {
+    if (!records.length) {
       const empty = document.createElement("div");
       empty.className = "lp-empty";
-      empty.textContent = keyword ? "没有匹配的日志" : (session ? "暂无日志，等待此会话的数据" : "先在连接区连接一个远端串口");
+      empty.textContent = session ? "暂无日志，等待此会话的数据" : "选择一个串口开始监听";
       logContainer.append(empty);
     }
     logContainer.scrollTop = logContainer.scrollHeight;
+    monitor.refreshSearch();
   }
   function append(kind, message, identity = selectedPort) {
     const session = sessions.get(identity);
@@ -788,7 +826,6 @@
       button.querySelector("use").setAttribute("href", connected ? "#lp-icon-disconnect" : "#lp-icon-link");
       button.disabled = detached && !connected;
     }
-    const details = portDetails[selectedPort];
     const selected = sessions.get(selectedPort);
     const isWindows = platform === "Windows";
     const connectedSessions = [...sessions].filter(([, session]) => session.connected);
@@ -827,24 +864,25 @@
       empty.textContent = "尚未建立串口连接。每条连接会获得独立的本地映射。";
       mappings.append(empty);
     }
-    const picker = find("[data-session-select]");
-    picker.replaceChildren();
-    for (const [identity, session] of sessions) {
-      const option = document.createElement("option");
-      option.value = identity;
-      option.textContent = portDetails[identity].host + " / " + portDetails[identity].label + (!session.connected ? " · 已断开" : isOffline(identity) ? " · 离线" : "");
-      option.selected = identity === selectedPort;
-      picker.append(option);
-    }
-    picker.disabled = !sessions.size;
+    monitor.setPorts(Object.entries(portDetails).map(([identity, port]) => ({
+      key: identity, group: port.host, label: port.label, path: port.remotePath,
+      title: port.host + " / " + port.remotePath, port: { path: port.remotePath },
+      connected: isConnected(identity)
+    })), selectedPort, entry => {
+      if (!isConnected(entry.key)) find(`[data-connect="${entry.key}"]`)?.click();
+      selectedPort = entry.key;
+      drawConnection();
+      drawLogs();
+    });
     const detached = isOffline(selectedPort);
-    find("[data-session-label]").textContent = details ? details.host + " / " + details.label : "选择一个串口开始监听";
+    find("[data-session-status]").hidden = !selected;
     find("[data-session-status]").textContent = !selected?.connected ? "未连接" : detached ? "等待重连" : (selected.paused ? "显示已暂停" : "监听中");
     find("[data-send]").disabled = !selected?.connected || detached;
     find(".lp-send input").disabled = !selected?.connected || detached;
     find('[data-action="pause"]').disabled = !selected;
     find('[data-action="pause"]').setAttribute("aria-label", selected?.paused ? "继续显示" : "暂停显示");
-    find('[data-action="pause"] use').setAttribute("href", selected?.paused ? "#lp-icon-play" : "#lp-icon-pause");
+    find('[data-action="pause"] use').setAttribute("href", selected?.paused ? "#lp-icon-monitor-play" : "#lp-icon-monitor-pause");
+    find('[data-action="disconnect"]').disabled = !selected?.connected;
     find("[data-notice]").textContent = !selected
       ? "先在连接区连接一个串口，再选择要监听的会话。"
       : !selected.connected
@@ -855,7 +893,10 @@
             ? "此会话的显示已暂停，数据仍会进入缓冲；点击继续显示可看到新数据。"
             : "演示数据。当前只显示所选会话的日志，清空和发送也仅作用于此会话。";
     const localNames = isWindows ? { usb: "COM5", bt: "COM6", new: "COM7" } : (platform === "Linux" ? { usb: "/dev/ttyUSB0", bt: "/dev/rfcomm0", new: "/dev/ttyACM0" } : { usb: "/dev/cu.usbserial-110", bt: "/dev/cu.Bluetooth-Incoming-Port", new: "/dev/cu.usbmodem-210" });
-    for (const label of all("[data-local-port]")) label.textContent = localNames[label.dataset.localPort];
+    for (const label of all("[data-local-port]")) {
+      label.textContent = localNames[label.dataset.localPort];
+      label.closest(".lp-shareitem").querySelector("svg use").setAttribute("href", label.dataset.localPort === "bt" ? "#lp-icon-bluetooth" : "#lp-icon-usb");
+    }
     drawCurves();
   }
   function drawSharing() {
@@ -909,21 +950,17 @@
     if (session.paused) session.pausedSnapshot = [];
     drawLogs();
   });
-  find("[data-session-select]").addEventListener("change", event => {
-    selectedPort = event.target.value;
-    drawConnection();
-    drawLogs();
+  find("[data-action=disconnect]").addEventListener("click", () => {
+    if (isConnected(selectedPort)) find(`[data-connect="${selectedPort}"]`)?.click();
   });
-  find("[data-filter]").addEventListener("input", drawLogs);
-  find("[data-format]").addEventListener("change", drawLogs);
+  find("[data-hex]").addEventListener("change", drawLogs);
   find(".lp-send").addEventListener("submit", event => {
     event.preventDefault();
     if (!isConnected(selectedPort) || isOffline(selectedPort)) return;
     const form = event.currentTarget;
     const message = form.elements.command.value;
     if (!message) return;
-    const endings = { crlf: "\r\n", cr: "\r", lf: "\n", none: "" };
-    append("TX", message + endings[form.elements.ending.value]);
+    append("TX", message + monitor.lineEnding(selectedPort, sessions.get(selectedPort).records));
     append("RX", message.trim() === "help" ? "Available commands: help, status, reboot" : "demo: " + message);
     form.elements.command.value = "";
     find("[data-notice]").textContent = sessions.get(selectedPort).paused ? "已模拟发送，当前会话显示暂停中；点击继续显示查看回应。" : "已模拟发送并生成回应，未向真实串口发送。";
@@ -1023,6 +1060,21 @@
     return response.status === 202 || response.status === 204 ? null : response.json();
   }
   const translations = {
+    "HEX 显示": "HEX display",
+    "查看最新日志": "Show latest logs",
+    "所选串口已离线": "Selected port is offline",
+    "可连接的串口": "Available serial ports",
+    "未检测到可连接的串口": "No available serial ports",
+    "选择串口": "Choose port",
+    "最近会话": "Recent sessions",
+    "蓝牙串口": "Bluetooth serial port",
+    "USB 串口": "USB serial port",
+    "UART 串口": "UART serial port",
+    "通用串口": "Serial port",
+    "搜索日志": "Search logs",
+    "上一个匹配行": "Previous matching line",
+    "下一个匹配行": "Next matching line",
+    "关闭日志搜索": "Close log search",
     "复制设备 ID": "Copy device ID",
     "设备 ID 已复制": "Device ID copied",
     "请复制选中的设备 ID": "Copy the selected device ID",
@@ -1477,7 +1529,7 @@
   languageObserver.observe(root, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["aria-label", "placeholder"] });
   applyPreferences();
   if (nativeDesktop) {
-    drawCurves = globalThis.initializeLinkportLive(root, nativeRequest, motion);
+    drawCurves = globalThis.initializeLinkportLive(root, nativeRequest, motion, monitor);
     const revision = preferenceRevision;
     nativeRequest("preferences").then(saved => {
       if (preferenceRevision === revision) { preferences = saved; applyPreferences(); }
