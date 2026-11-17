@@ -27,10 +27,15 @@ func (n *Network) loadManagedCatalog(directory string) error {
 	} else if err != nil {
 		return err
 	} else {
-		defer f.Close()
 		raw, err = io.ReadAll(io.LimitReader(f, relaycatalog.MaxSize+1))
+		// Windows cannot replace a directory cache while this read handle is
+		// open. Close it before a newer bundled snapshot is written below.
+		closeErr := f.Close()
 		if err != nil {
 			return err
+		}
+		if closeErr != nil {
+			return closeErr
 		}
 	}
 	n.catalog, err = relaycatalog.Verify(raw, relaycatalog.PublicKey, time.Now())
