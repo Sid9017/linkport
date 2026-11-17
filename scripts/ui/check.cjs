@@ -279,6 +279,24 @@ async function checkFunctional(page, browserName) {
   await page.waitForFunction(() => document.querySelector("[data-log]").textContent.includes("background update"));
   assert.equal(await page.locator('[data-search-current="true"]').getAttribute("data-record-key"), currentMatch);
   assert.ok(Math.abs(await page.locator("[data-log]").evaluate(node => node.scrollTop) - scrollPosition) < 3);
+  while (remoteSession.records.length < 500) receive("retained tail " + remoteSession.records.length + "\n");
+  await page.waitForFunction(() => document.querySelectorAll(".lp-logline").length === 500);
+  const readingPosition = () => page.locator("[data-log]").evaluate(log => {
+    const viewport = log.getBoundingClientRect();
+    const row = [...log.querySelectorAll("[data-record-key]")].find(row => row.getBoundingClientRect().bottom > viewport.top);
+    return { key: row.dataset.recordKey, offset: row.getBoundingClientRect().top - viewport.top };
+  });
+  const retainAndCheckPosition = async label => {
+    const position = await readingPosition();
+    remoteSession.records.splice(0, 12);
+    receive(label + "\n");
+    await page.waitForFunction(label => document.querySelector("[data-log]").textContent.includes(label), label);
+    const retained = await readingPosition();
+    assert.equal(retained.key, position.key, label + ": visible record changed after eviction");
+    assert.ok(Math.abs(retained.offset - position.offset) < 3, label + ": visible record moved after eviction");
+  };
+  await retainAndCheckPosition("search eviction");
+  assert.equal(await page.locator('[data-search-current="true"]').getAttribute("data-record-key"), currentMatch);
   await page.locator("[data-search-prev]").click();
   assert.equal(await page.locator("[data-search-count]").textContent(), "1/3");
   await page.getByLabel("搜索日志", { exact: true }).press("Shift+Enter");
@@ -300,6 +318,22 @@ async function checkFunctional(page, browserName) {
   }));
   await page.keyboard.press("Escape");
   await page.emulateMedia({ reducedMotion: "no-preference" });
+  await settleMotion(page);
+  await page.locator("[data-log]").evaluate(log => {
+    const row = log.querySelectorAll("[data-record-key]")[200];
+    log.scrollTop += row.getBoundingClientRect().top - log.getBoundingClientRect().top + 7;
+  });
+  await retainAndCheckPosition("reading eviction");
+  const hiddenPosition = await readingPosition();
+  await page.locator("[data-nav=share]").click();
+  remoteSession.records.splice(0, 12);
+  receive("hidden eviction\n");
+  await page.waitForFunction(() => document.querySelector("[data-log]").textContent.includes("hidden eviction"));
+  await page.locator("[data-nav=monitor]").click();
+  await settleMotion(page);
+  const restoredPosition = await readingPosition();
+  assert.equal(restoredPosition.key, hiddenPosition.key, "hidden monitor lost its visible record after eviction");
+  assert.ok(Math.abs(restoredPosition.offset - hiddenPosition.offset) < 3, "hidden monitor lost its record offset after eviction");
   await page.locator("[data-port-picker-toggle]").click();
   for (const type of ["usb", "bluetooth", "uart", "serial"]) {
     assert.ok(await page.locator(`[data-port-option] [data-transport="${type}"]`).count() > 0);

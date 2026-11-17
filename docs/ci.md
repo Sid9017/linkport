@@ -24,7 +24,9 @@ the draft release waits for all three platform workflows and their packages.
 The backend job runs the root module's full test suite, covering explicit
 sharing, persistence, peer identity, RFC 2217 framing and acknowledgements,
 session isolation, device removal and revocation. It also validates and
-packages the native CLI.
+packages the native CLI. Windows-specific tests cover fallback replacement on
+filesystems without POSIX rename support, preserving the previous file when
+replacement fails, and Unicode/long paths.
 
 The separate Unix virtual-port job runs `internal/vport`, `internal/session`,
 `internal/engine` and `internal/p2p` with `-race`. These tests create actual operating-system
@@ -44,8 +46,10 @@ connections without opening serial devices or signing into a network.
 The browser loads the real desktop HTML, live JavaScript and bundled Wails
 runtime. Tests check title-bar drag messages and button exclusion, Windows COM
 pair fields, connection errors/success, sharing, local monitoring, closing and
-isolating sessions, exact HEX bytes, millisecond timestamps, sending, filtering,
-pause/clear/export and viewport overflow/empty-state layout.
+isolating sessions, exact HEX bytes, millisecond timestamps, sending, log search,
+pause/clear/export and viewport overflow/empty-state layout. Search and reading
+positions are checked while retained records are evicted, including updates
+while the monitor is hidden.
 
 These are browser interaction tests, not native WebView2/WKWebView automation.
 They verify that the runtime receives a drag request, not that the OS physically

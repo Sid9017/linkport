@@ -15,6 +15,7 @@ globalThis.initializeLinkportLive = (root, request, motion, monitor) => {
   let logSession = null;
   let followLog = true;
   let lastLogScroll = 0;
+  let logAnchors = [];
   let lastLogSequence = 0;
   let unreadLogRecords = 0;
   let localTargetUnavailable = false;
@@ -359,6 +360,24 @@ globalThis.initializeLinkportLive = (root, request, motion, monitor) => {
       else openConnection(entry.device, entry.port);
     });
   }
+  function rememberLogPosition() {
+    lastLogScroll = log.scrollTop;
+    const viewport = log.getBoundingClientRect();
+    logAnchors = [...log.querySelectorAll("[data-record-key]")].flatMap(row => {
+      const bounds = row.getBoundingClientRect();
+      return bounds.bottom > viewport.top && bounds.top < viewport.bottom ?
+        [{ key: row.dataset.recordKey, offset: bounds.top - viewport.top }] : [];
+    });
+  }
+  function restoreLogPosition() {
+    const rows = new Map([...log.querySelectorAll("[data-record-key]")].map(row => [row.dataset.recordKey, row]));
+    const anchor = logAnchors.find(item => rows.has(item.key));
+    if (anchor) {
+      log.scrollTop += rows.get(anchor.key).getBoundingClientRect().top - log.getBoundingClientRect().top - anchor.offset;
+    } else {
+      log.scrollTop = logAnchors.length ? 0 : lastLogScroll;
+    }
+  }
   function renderLog(force = false) {
     const session = currentSession();
     const changedSession = logSession !== selected;
@@ -366,12 +385,13 @@ globalThis.initializeLinkportLive = (root, request, motion, monitor) => {
       logSession = selected;
       followLog = true;
       lastLogScroll = 0;
+      logAnchors = [];
       lastLogSequence = 0;
       unreadLogRecords = 0;
     }
     const visible = log.getClientRects().length > 0;
     if (visible && !changedSession) {
-      lastLogScroll = log.scrollTop;
+      rememberLogPosition();
       followLog = log.scrollHeight - log.scrollTop - log.clientHeight < 24;
     }
     const incoming = (session?.records || []).filter(record => record.sequence > lastLogSequence && ["RX", "TX"].includes(record.kind)).length;
@@ -408,7 +428,10 @@ globalThis.initializeLinkportLive = (root, request, motion, monitor) => {
       }
       const latest = !monitor.isSearching() && (followLog || force || changedSession);
       if (latest) unreadLogRecords = 0;
-      if (visible) log.scrollTop = latest ? log.scrollHeight : lastLogScroll;
+      if (visible) {
+        if (latest) log.scrollTop = log.scrollHeight;
+        else restoreLogPosition();
+      }
       followLog = latest;
       monitor.refreshSearch(force, force && monitor.isSearching());
     }
@@ -549,7 +572,7 @@ globalThis.initializeLinkportLive = (root, request, motion, monitor) => {
   find("[data-hex]").addEventListener("change", () => renderLog());
   log.addEventListener("scroll", () => {
     if (!log.getClientRects().length) return;
-    lastLogScroll = log.scrollTop;
+    rememberLogPosition();
     followLog = log.scrollHeight - log.scrollTop - log.clientHeight < 24;
     if (followLog) {
       unreadLogRecords = 0;
@@ -558,7 +581,8 @@ globalThis.initializeLinkportLive = (root, request, motion, monitor) => {
   }, { passive: true });
   root.addEventListener("linkport:screen", event => {
     if (event.detail !== "monitor") return;
-    log.scrollTop = followLog && !monitor.isSearching() ? log.scrollHeight : lastLogScroll;
+    if (followLog && !monitor.isSearching()) log.scrollTop = log.scrollHeight;
+    else restoreLogPosition();
   });
   find("[data-log-latest]").addEventListener("click", () => {
     monitor.closeSearch(false);
