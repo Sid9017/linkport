@@ -85,3 +85,22 @@ func TestPublicUpdatesVerifySignaturesAndKeepChannelsSeparate(t *testing.T) {
 		t.Fatal("nightly offered itself again", err)
 	}
 }
+
+func TestPublicFeedFailuresStayErrors(t *testing.T) {
+	for _, status := range []int{http.StatusNotFound, http.StatusServiceUnavailable, http.StatusNoContent} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(status)
+			}))
+			defer server.Close()
+			provider, err := newSignedProvider(server.URL, "stable", nil, server.Client())
+			if err != nil {
+				t.Fatal(err)
+			}
+			release, err := provider.Check(t.Context(), updater.CheckRequest{CurrentVersion: "0.0.2", Platform: "darwin", Arch: "arm64"})
+			if release != nil || (err == nil) != (status == http.StatusNoContent) {
+				t.Fatalf("HTTP %d produced release=%v error=%v", status, release, err)
+			}
+		})
+	}
+}

@@ -193,6 +193,17 @@ type signedProvider struct {
 	channel string
 }
 
+type updateTransport struct{ base http.RoundTripper }
+
+func (t updateTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	response, err := t.base.RoundTrip(request)
+	if err == nil && response.StatusCode == http.StatusNotFound {
+		response.Body.Close()
+		return nil, errors.New("public update endpoint or package not found")
+	}
+	return response, err
+}
+
 func newSignedProvider(source, channel string, key ed25519.PublicKey, client *http.Client) (*signedProvider, error) {
 	if channel != "stable" && channel != "nightly" {
 		return nil, errors.New("unsupported update channel")
@@ -201,9 +212,21 @@ func newSignedProvider(source, channel string, key ed25519.PublicKey, client *ht
 	if err != nil || base.Host == "" || base.User != nil || base.RawQuery != "" || base.Fragment != "" {
 		return nil, errors.New("invalid update source")
 	}
+	if client == nil {
+		client = &http.Client{Timeout: 30 * time.Second}
+	}
+	copyClient := *client
+	transport := client.Transport
+	if transport == nil {
+		transport = http.DefaultTransport
+	}
+	// The public service deliberately uses 204 for an unpublished channel.
+	// A missing deployment/route must remain an error, rather than the
+	// endpoint provider's generic interpretation of 404 as "up to date".
+	copyClient.Transport = updateTransport{base: transport}
 	p, err := endpoint.New(endpoint.Config{
 		URL:     strings.TrimRight(source, "/") + "/updates/" + channel + ".json",
-		Channel: channel, HTTPClient: client,
+		Channel: channel, HTTPClient: &copyClient,
 	})
 	if err != nil {
 		return nil, err
