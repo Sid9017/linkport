@@ -388,9 +388,21 @@ async function checkDeviceManagement(page, browserName) {
   assert.ok((await page.locator("[data-devices-dialog]").boundingBox()).height > compactHeight + 30);
   await page.locator("[data-invite-copy]").click();
   assert.equal(await page.evaluate(() => window.copiedText), "linkport1.test-invitation");
+  await page.setViewportSize({ width: 1120, height: 600 });
   await page.locator("[data-pair-code]").fill("expired");
   await page.locator("[data-pair-add]").click();
   await page.waitForFunction(() => document.querySelector("[data-device-message]").textContent.includes("已过期"));
+  await page.waitForFunction(() => {
+    const message = document.querySelector("[data-device-message]");
+    const body = document.querySelector("[data-devices-dialog] .lp-settings-body").getBoundingClientRect();
+    const bounds = message.getBoundingClientRect();
+    return bounds.top >= body.top && bounds.bottom <= body.bottom &&
+      message.closest(".lp-settings-section").contains(document.querySelector("[data-pair-code]"));
+  });
+  assert.equal(await page.locator("[data-pair-code]").inputValue(), "expired");
+  await settleMotion(page);
+  await page.screenshot({ path: path.join(output, `${browserName}-pairing-error-short-window.png`) });
+  await page.setViewportSize({ width: 1120, height: 780 });
   await page.locator("[data-pair-code]").fill("linkport1.from-other-device");
   await page.locator("[data-pair-add]").click();
   await page.locator("[data-device-remove]").waitFor();

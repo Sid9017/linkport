@@ -288,7 +288,7 @@
 #linkport-review [data-paired-devices] .lp-setting-info > span { overflow-wrap: anywhere; }
 #linkport-review [data-paired-devices] code { color: var(--lp-muted); font: calc(11px * var(--lp-font-scale))/1.5 var(--lp-mono); }
 #linkport-review [data-device-message]:empty, #linkport-review [data-invitation-expiry]:empty { display: none; }
-#linkport-review [data-device-message] { padding: 0 0 12px; }
+#linkport-review [data-device-message] { padding-top: 9px; }
 #linkport-review [data-paired-count] { font: calc(11px * var(--lp-font-scale))/1.5 var(--lp-mono); color: var(--lp-muted); }
 #linkport-review [data-devices-dialog] .lp-inline { flex-wrap: wrap; }
 #linkport-review [data-devices-dialog] .lp-settings-status { overflow-wrap: anywhere; }
@@ -313,7 +313,19 @@
     <symbol id="lp-icon-export" viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M4 16v5h16v-5"/></symbol>
     <symbol id="lp-icon-send" viewBox="0 0 24 24"><path d="m3 3 18 9-18 9 4-9zm4 9h14"/></symbol>
     <symbol id="lp-icon-disconnect" viewBox="0 0 24 24"><path d="m9 8 2-2a5 5 0 0 1 7 7l-2 2m-1 1-2 2a5 5 0 0 1-7-7l2-2M3 3l18 18"/></symbol>
-    <symbol id="lp-icon-settings" viewBox="0 0 24 24"><path d="m10 3-.6 3-2.2 1.3-2.8-1L2.4 10l2.2 2v2l-2.2 2 2 3.7 2.8-1L9.4 20l.6 3h4l.6-3 2.2-1.3 2.8 1 2-3.7-2.2-2v-2l2.2-2-2-3.7-2.8 1L14.6 6 14 3z" transform="translate(0 -1) scale(1 .94)"/><circle cx="12" cy="12" r="3"/></symbol>
+    <symbol id="lp-icon-settings" viewBox="0 0 24 24">
+      <g fill="currentColor" stroke="none">
+        <path fill-rule="evenodd" d="M20.25 12a8.25 8.25 0 1 1 -16.5 0 8.25 8.25 0 1 1 16.5 0Z M15.25 12a3.25 3.25 0 1 1 -6.5 0 3.25 3.25 0 1 1 6.5 0Z"/>
+        <rect x="10.25" y="1.5" width="3.5" height="4.5" rx=".7"/>
+        <rect x="10.25" y="1.5" width="3.5" height="4.5" rx=".7" transform="rotate(45 12 12)"/>
+        <rect x="10.25" y="1.5" width="3.5" height="4.5" rx=".7" transform="rotate(90 12 12)"/>
+        <rect x="10.25" y="1.5" width="3.5" height="4.5" rx=".7" transform="rotate(135 12 12)"/>
+        <rect x="10.25" y="1.5" width="3.5" height="4.5" rx=".7" transform="rotate(180 12 12)"/>
+        <rect x="10.25" y="1.5" width="3.5" height="4.5" rx=".7" transform="rotate(225 12 12)"/>
+        <rect x="10.25" y="1.5" width="3.5" height="4.5" rx=".7" transform="rotate(270 12 12)"/>
+        <rect x="10.25" y="1.5" width="3.5" height="4.5" rx=".7" transform="rotate(315 12 12)"/>
+      </g>
+    </symbol>
     <symbol id="lp-icon-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
     <symbol id="lp-icon-arrow" viewBox="0 0 24 24"><path d="M4 12h16m-5-5 5 5-5 5"/></symbol>
     <symbol id="lp-icon-chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
@@ -1277,11 +1289,16 @@
   let devicesSignature = "";
   let networkFormLoaded = false;
   let devicesGeneration = 0;
-  const deviceMessage = message => {
+  const deviceMessage = (message, anchor) => {
     const node = find("[data-device-message]");
+    const section = anchor?.closest(".lp-settings-section");
+    if (section && node.parentElement !== section) section.append(node);
     if (node.textContent === message) return;
     node.textContent = message;
-    if (message) enter(node, 3);
+    if (message) {
+      enter(node, 3);
+      if (devicesDialog.open) node.scrollIntoView({ block: "nearest", behavior: reducedMotion.matches ? "instant" : "smooth" });
+    }
   };
   async function refreshDevices() {
     if (!nativeDesktop) { deviceMessage("在桌面版中管理真实设备"); return; }
@@ -1318,7 +1335,7 @@
       remove.addEventListener("click", async () => {
         remove.disabled = true;
         try { await nativeRequest("devices", "DELETE", { id: peer.id }); await refreshDevices(); }
-        catch (error) { deviceMessage(error.message); remove.disabled = false; }
+        catch (error) { deviceMessage(error.message, remove); remove.disabled = false; }
       });
       row.append(details, remove); list.append(row);
       if (!previousPeers.has(peer.id)) enter(row, 3);
@@ -1330,8 +1347,8 @@
     devicesGeneration++;
     networkFormLoaded = false;
     deviceMessage("");
-    refreshDevices().catch(error => deviceMessage(error.message));
-    if (!devicesPoll) devicesPoll = setInterval(() => refreshDevices().catch(error => deviceMessage(error.message)), 3000);
+    refreshDevices().catch(error => deviceMessage(error.message, find("[data-paired-devices]")));
+    if (!devicesPoll) devicesPoll = setInterval(() => refreshDevices().catch(error => deviceMessage(error.message, find("[data-paired-devices]"))), 3000);
   }
   for (const button of all("[data-device-manager-open], [data-live-add]")) button.addEventListener("click", openDevices);
   find("[data-devices-close]").addEventListener("click", () => closeDialog(devicesDialog));
@@ -1352,7 +1369,7 @@
   find("[data-device-id-copy]").addEventListener("click", async () => {
     const identity = networkState?.nodeID;
     if (!identity) return;
-    try { await navigator.clipboard.writeText(identity); deviceMessage("设备 ID 已复制"); }
+    try { await navigator.clipboard.writeText(identity); deviceMessage("设备 ID 已复制", find("[data-device-id-copy]")); }
     catch {
       disclosure(find("[data-device-id-toggle]"), true, false);
       const selection = window.getSelection();
@@ -1360,7 +1377,7 @@
       range.selectNodeContents(find("[data-device-id]"));
       selection.removeAllRanges();
       selection.addRange(range);
-      deviceMessage("请复制选中的设备 ID");
+      deviceMessage("请复制选中的设备 ID", find("[data-device-id-copy]"));
     }
   });
   find("[data-invite-create]").addEventListener("click", async event => {
@@ -1375,26 +1392,26 @@
       find("[data-invite-copy]").disabled = false;
       reveal(find("[data-invitation-panel]"), true);
       deviceMessage("");
-    } catch (error) { deviceMessage(error.message); }
+    } catch (error) { deviceMessage(error.message, button); }
     finally { button.disabled = false; }
   });
   find("[data-invite-copy]").addEventListener("click", async () => {
     const input = find("[data-invitation]");
     if (!input.value) return;
-    try { await navigator.clipboard.writeText(input.value); deviceMessage("邀请已复制"); }
-    catch { input.focus(); input.select(); deviceMessage("请复制选中的配对邀请"); }
+    try { await navigator.clipboard.writeText(input.value); deviceMessage("邀请已复制", input); }
+    catch { input.focus(); input.select(); deviceMessage("请复制选中的配对邀请", input); }
   });
   find("[data-pair-add]").addEventListener("click", async event => {
     if (!nativeDesktop) { deviceMessage("在桌面版中添加设备"); return; }
     const button = event.currentTarget; button.disabled = true;
-    deviceMessage("正在验证设备身份并配对…");
+    deviceMessage("正在验证设备身份并配对…", button);
     try {
       await nativeRequest("devices", "POST", { code: find("[data-pair-code]").value.trim() });
       find("[data-pair-code]").value = "";
-      deviceMessage("配对成功，双方已保存对方的设备公钥。");
+      deviceMessage("配对成功，双方已保存对方的设备公钥。", button);
       await refreshDevices();
       await nativeRequest("refresh", "POST");
-    } catch (error) { deviceMessage(error.message); }
+    } catch (error) { deviceMessage(error.message, button); }
     finally { button.disabled = !find("[data-pair-code]").value.trim(); }
   });
   find("[data-pair-code]").addEventListener("input", event => {
@@ -1431,9 +1448,9 @@
         relayURLs: find("[data-relay-mode]").value === "custom" ? find("[data-relay-urls]").value.split(/[\s,]+/).filter(Boolean) : [],
         discoveryURL: find("[data-relay-mode]").value === "disabled" ? "" : find("[data-discovery-url]").value.trim()
       });
-      deviceMessage("设置已保存，网络连接已暂停。请重启 Linkport。");
+      deviceMessage("设置已保存，网络连接已暂停。请重启 Linkport。", button);
       await refreshNetwork();
-    } catch (error) { deviceMessage(error.message); }
+    } catch (error) { deviceMessage(error.message, button); }
     finally { button.disabled = false; }
   });
   find("[data-identity-reset]").addEventListener("click", async event => {
@@ -1441,10 +1458,10 @@
     const button = event.currentTarget; button.disabled = true;
     try {
       await nativeRequest("identity/reset", "POST", { confirmation: find("[data-reset-confirmation]").value.trim() });
-      deviceMessage("本机身份已重置，配对关系已清除。请重启并重新配对设备。");
+      deviceMessage("本机身份已重置，配对关系已清除。请重启并重新配对设备。", button);
       find("[data-reset-confirmation]").value = "";
       await refreshDevices();
-    } catch (error) { deviceMessage(error.message); }
+    } catch (error) { deviceMessage(error.message, button); }
     finally { button.disabled = !find("[data-reset-confirmation]").value.trim(); }
   });
   find("[data-update-action]").addEventListener("click", async () => {
