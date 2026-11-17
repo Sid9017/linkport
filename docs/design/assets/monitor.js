@@ -178,6 +178,8 @@ globalThis.initializeLinkportMonitor = (root, motion) => {
     }
   }
   function refreshSearch(reset = false, navigate = false) {
+    const continueNavigation = Boolean(scrollFrame);
+    cancelScroll();
     clearMarks();
     matches = [];
     const query = search.hidden || search.inert ? "" : searchInput.value.toLowerCase();
@@ -203,7 +205,7 @@ globalThis.initializeLinkportMonitor = (root, motion) => {
       if (matched) matches.push(row);
     }
     const previous = reset ? -1 : matches.findIndex(row => row.dataset.recordKey === matchKey);
-    selectMatch(previous >= 0 ? previous : Math.max(0, Math.min(matchIndex, matches.length - 1)), navigate);
+    selectMatch(previous >= 0 ? previous : Math.max(0, Math.min(matchIndex, matches.length - 1)), navigate || continueNavigation);
   }
   function openSearch() {
     closePicker();

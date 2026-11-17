@@ -49,7 +49,7 @@ pair fields, connection errors/success, sharing, local monitoring, closing and
 isolating sessions, exact HEX bytes, millisecond timestamps, sending, log search,
 pause/clear/export and viewport overflow/empty-state layout. Search and reading
 positions are checked while retained records are evicted, including updates
-while the monitor is hidden.
+while the monitor is hidden and eviction during an active search animation.
 
 These are browser interaction tests, not native WebView2/WKWebView automation.
 They verify that the runtime receives a drag request, not that the OS physically

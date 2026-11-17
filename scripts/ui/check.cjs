@@ -107,13 +107,18 @@ async function checkFunctional(page, browserName) {
   const openedLocal = [];
   const shared = [];
   let rejectConnect = true;
+  let beforeStateResponse;
   await page.route("**/native/v1/**", async route => {
     const operation = new URL(route.request().url()).pathname.split("/").at(-1);
     assert.equal(route.request().headers()["x-linkport-token"], "browser-test-only");
     const body = route.request().method() === "GET" ? {} : JSON.parse(route.request().postData() || "{}");
     let response;
-    if (operation === "state") response = fixture;
-    else if (operation === "network") response = fixture.network;
+    if (operation === "state") {
+      const beforeResponse = beforeStateResponse;
+      beforeStateResponse = null;
+      if (beforeResponse) await beforeResponse();
+      response = fixture;
+    } else if (operation === "network") response = fixture.network;
     else if (operation === "devices") response = fixture.devices;
     else if (operation === "local") {
       assert.equal(body.path, "/dev/local-fixture");
@@ -297,6 +302,45 @@ async function checkFunctional(page, browserName) {
   };
   await retainAndCheckPosition("search eviction");
   assert.equal(await page.locator('[data-search-current="true"]').getAttribute("data-record-key"), currentMatch);
+  beforeStateResponse = async () => {
+    const start = await page.locator("[data-log]").evaluate(log => log.scrollTop);
+    await page.locator("[data-search-next]").click();
+    await page.waitForFunction(start => {
+      const row = document.querySelector('[data-search-current="true"]').getBoundingClientRect();
+      const log = document.querySelector("[data-log]");
+      const viewport = log.getBoundingClientRect();
+      return log.scrollTop > start + 1 && Math.abs((row.top + row.bottom - viewport.top - viewport.bottom) / 2) > 20;
+    }, start);
+    remoteSession.records.splice(0, 12);
+    receive("animation eviction\n");
+  };
+  await page.waitForFunction(() => document.querySelector("[data-log]").textContent.includes("animation eviction"));
+  await page.waitForFunction(() => {
+    const row = document.querySelector('[data-search-current="true"]').getBoundingClientRect();
+    const log = document.querySelector("[data-log]").getBoundingClientRect();
+    return Math.abs((row.top + row.bottom - log.top - log.bottom) / 2) < 3;
+  }, null, { timeout: 2000 });
+  await page.locator("[data-log]").evaluate(log => new Promise(resolve => {
+    let previous = log.scrollTop;
+    let stableSince = performance.now();
+    const frame = now => {
+      if (log.scrollTop !== previous) { previous = log.scrollTop; stableSince = now; }
+      if (now - stableSince >= 100) resolve();
+      else requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  }));
+  assert.ok(await page.evaluate(() => {
+    const row = document.querySelector('[data-search-current="true"]').getBoundingClientRect();
+    const log = document.querySelector("[data-log]").getBoundingClientRect();
+    return Math.abs((row.top + row.bottom - log.top - log.bottom) / 2) < 3;
+  }), "an old animation frame moved the match away after log eviction");
+  await page.locator("[data-search-prev]").click();
+  await page.waitForFunction(() => {
+    const row = document.querySelector('[data-search-current="true"]').getBoundingClientRect();
+    const log = document.querySelector("[data-log]").getBoundingClientRect();
+    return Math.abs((row.top + row.bottom - log.top - log.bottom) / 2) < 3;
+  });
   await page.locator("[data-search-prev]").click();
   assert.equal(await page.locator("[data-search-count]").textContent(), "1/3");
   await page.getByLabel("搜索日志", { exact: true }).press("Shift+Enter");
