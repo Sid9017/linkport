@@ -1,5 +1,5 @@
 const stepContent = [
-  { title: "邀请一次，记住彼此。", description: "一台生成邀请，另一台粘贴导入。两端通过设备公钥建立信任。", note: "5 分钟有效 · 仅限一次", next: "下一步：共享串口" },
+  { title: "邀请一次，记住彼此。", description: "每台新设备单独邀请，导入后自动交换公钥，双方互相信任。", note: "5 分钟有效 · 每次配对一台设备", next: "下一步：共享串口" },
   { title: "只开放你选中的串口。", description: "在共享端勾选目标端口，对端便能看到。试试右侧的共享开关。", note: "新接入的设备默认不共享", next: "下一步：本机连接" },
   { title: "工具照旧，串口换个位置。", description: "选择设备和串口，连接后用本机工具打开映射路径。", note: "也可在 Linkport 中直接监听与发送", next: "再看一次：配对机器" },
 ];
@@ -86,23 +86,64 @@ document.getElementById("demo-share").addEventListener("change", event => {
   document.getElementById("mapping-unavailable").hidden = shared;
 });
 
-const pathContent = {
-  direct: { description: "数据直接在两台设备间传输。", caption: "DEVICE ↔ DEVICE", label: "设备直连" },
-  relay: { description: "中继只转发密文，串口内容由两端解密。", caption: "DEVICE ↔ RELAY ↔ DEVICE", label: "直连受限" },
-};
 const networkDemo = document.querySelector(".network-demo");
-const pathButtons = [...document.querySelectorAll("button[data-mode]")];
-pathButtons.forEach(button => button.addEventListener("click", () => {
-  const mode = button.dataset.mode;
-  networkDemo.dataset.mode = mode;
-  pathButtons.forEach(item => {
-    item.classList.toggle("is-active", item === button);
-    item.setAttribute("aria-pressed", String(item === button));
+const networkFlow = document.querySelector(".network-flow");
+const networkPackets = [...document.querySelectorAll(".network-packet")];
+const networkToggle = document.querySelector(".network-motion-toggle");
+let networkRequested = !reducedMotion.matches;
+let networkVisible = false;
+let networkAnimation;
+
+function syncNetworkAnimation() {
+  if (!networkAnimation) return;
+  if (networkRequested && networkVisible) networkAnimation.play();
+  else networkAnimation.pause();
+  networkToggle.setAttribute("aria-label", networkRequested ? "暂停连接动画" : "播放连接动画");
+  networkToggle.setAttribute("aria-pressed", String(networkRequested));
+  networkToggle.querySelector("span").textContent = networkRequested ? "暂停" : "播放";
+  networkToggle.querySelector("use").setAttribute("href", networkRequested ? "#i-pause" : "#i-play");
+}
+
+if (window.gsap) {
+  const progress = { value: 0 };
+  function drawNetworkPackets() {
+    const length = networkFlow.getTotalLength();
+    networkPackets.forEach((packet, index) => {
+      const position = (progress.value + index * .48) % 1;
+      const point = networkFlow.getPointAtLength(length * position);
+      packet.setAttribute("cx", point.x);
+      packet.setAttribute("cy", point.y);
+      packet.style.opacity = Math.min(1, position * 12, (1 - position) * 12);
+    });
+  }
+  networkAnimation = gsap.timeline({ repeat: -1, paused: true, onUpdate: drawNetworkPackets });
+  document.querySelectorAll(".network-route").forEach(route => {
+    networkAnimation.call(() => {
+      document.querySelectorAll("[data-route-label]").forEach(label => {
+        label.classList.toggle("is-active", label.dataset.routeLabel === route.dataset.route);
+      });
+    });
+    const color = getComputedStyle(route).stroke;
+    networkAnimation.to(networkFlow, { attr: { d: route.getAttribute("d") }, stroke: color, duration: .8, ease: "power2.inOut" });
+    networkAnimation.to(networkPackets, { fill: color, duration: .8 }, "<");
+    networkAnimation.fromTo(progress, { value: 0 }, { value: 1, duration: 3.2, ease: "none" });
   });
-  document.getElementById("path-description").textContent = pathContent[mode].description;
-  document.getElementById("path-caption").textContent = pathContent[mode].caption;
-  document.querySelector(".direct-label").textContent = pathContent[mode].label;
-}));
+  networkToggle.hidden = false;
+  networkToggle.addEventListener("click", () => {
+    networkRequested = !networkRequested;
+    syncNetworkAnimation();
+  });
+  new IntersectionObserver(entries => {
+    networkVisible = entries[0].isIntersecting;
+    syncNetworkAnimation();
+  }, { threshold: .1 }).observe(networkDemo);
+  reducedMotion.addEventListener("change", () => {
+    networkRequested = !reducedMotion.matches;
+    syncNetworkAnimation();
+  });
+  drawNetworkPackets();
+  syncNetworkAnimation();
+}
 
 const menuToggle = document.querySelector(".menu-toggle");
 const mobileMenu = document.getElementById("mobile-nav");
