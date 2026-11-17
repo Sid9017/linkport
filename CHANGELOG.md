@@ -9,8 +9,9 @@
 - Include bounded LAN interface candidates for wildcard-bound iroh endpoints.
 - Show actual relay connectivity and the last error. User-reported two-machine
   invitation pairing succeeded; public-network and hardware limits remain documented.
-- Add distinct Stable, Nightly and Dev package versions. Dev builds carry commit
-  metadata and do not update themselves. Stable and Nightly only use their own channel.
+- Add Stable and Nightly as the two public release channels. Unpublished local
+  builds carry commit metadata and do not update themselves. Stable and Nightly
+  only use their own channel.
 - Publish complete signed CLI and desktop packages for macOS, Windows and Linux on
   amd64 and arm64 after the full compatibility checks. Every desktop update must
   pass SHA-256 and the embedded publisher's Ed25519 verification.

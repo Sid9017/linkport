@@ -11,7 +11,7 @@ The desktop app includes a serial monitor, text and HEX sending, and independent
 sessions for multiple ports. A headless CLI runs the sharing service on machines
 without a desktop.
 
-**Status:** 0.0.2 early release series with Stable, Nightly and Dev channels. Windows, macOS, and Linux are target
+**Status:** 0.0.2 early release series with Stable and Nightly release channels. Windows, macOS, and Linux are target
 platforms. Automated tests exercise encrypted loopback connections and isolated
 serial fixtures; real hardware, drivers, and cross-network behavior still need
 validation in their target environments.
@@ -250,7 +250,7 @@ Actual com0com driver tests require a dedicated runner and manual dispatch.
 Build CLI archives with `python3 scripts/release.py`; validate the packaging
 script with `python3 scripts/release.py --self-test`. Desktop packages use
 `scripts/desktop.py`. Release automation publishes complete signed Stable releases and Nightly prereleases
-after full checks. Dev archives carry a commit identity and never update themselves.
+after full checks. Unpublished local archives carry a commit identity and never update themselves.
 Public downloads and channel-specific update manifests are served from
 `https://linkport.grezl.link`; the source repository can remain private. See the
 [release guide](docs/releasing.md).

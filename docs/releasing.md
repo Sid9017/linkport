@@ -9,15 +9,17 @@ python3 scripts/version.py patch
 # Also supports minor and major. Review the new CHANGELOG section, then commit.
 ```
 
-## Channels
+## Public release channels
 
 | Channel | Version and tag | Distribution and updates |
 | --- | --- | --- |
 | Stable | `0.0.2`, tag `v0.0.2` | Published GitHub release; only newer Stable updates |
 | Nightly | `0.0.2-nightly.YYYYMMDDHHMMSS.RUN`, matching `v` tag | Prerelease; only newer Nightly updates |
-| Dev | `0.0.2-dev.EPOCH.gCOMMIT[.dirty]` | Local/CI test archives; no automatic update checks |
 
-A plain `go build` reports the base `-dev` version with unknown commit/date.
+Unpublished local/CI archives use `0.0.2-dev.EPOCH.gCOMMIT[.dirty]` metadata,
+appear as "Local build" in the desktop UI, and never check for updates. They are
+not a third public download or update channel. A plain `go build` reports the
+base `-dev` version with unknown commit/date.
 Packagers inject `Version`, `Channel`, `Commit` and `Date` in
 `github.com/Sid9017/linkport/internal/version`. Tagged packages require a clean
 checkout and a tag resolving to HEAD. Existing tags and published assets are
@@ -33,7 +35,7 @@ backend job. Releases use the full six-target native profile.
 
 Use the pinned Go toolchain and Python 3.11 or later. macOS requires the native
 SDK and cgo; Linux desktop requires GTK 4 and WebKitGTK 6. These commands create
-Dev packages by default:
+unpublished local packages by default:
 
 ```sh
 python3 scripts/release.py --validate-only
@@ -91,7 +93,8 @@ USB/cross-network tests are distinct from package signatures and native CI.
 ## Public downloads with private source
 
 The existing `Sid9017/linkport` source and Release storage remain private.
-Netlify serves the website and the release gateway at `linkport.grezl.link`:
+Netlify is configured to serve the website and release gateway at
+`linkport.grezl.link` once deployment and runtime credentials are set up:
 
 - `/api/releases`: published Stable/Nightly versions and desktop/CLI downloads.
 - `/updates/stable.json` and `/updates/nightly.json`: Wails endpoint manifests.
@@ -105,7 +108,7 @@ bundles. Link the existing repository to Netlify with publish directory
 An authorized Netlify GitHub App connection for builds does not by itself
 configure the function's separate runtime credential.
 
-The gateway ignores drafts and Dev tags, checks all six desktop checksums and
+The gateway ignores drafts and unpublished local tags, checks all six desktop checksums and
 signatures before advertising a release, and exposes only explicitly named
 package assets. GitHub download credentials never reach a client; authenticated
 asset requests yield temporary CDN redirects without forwarding the token.
@@ -116,5 +119,7 @@ links. No repository visibility change or new repository is required.
 Desktop pins the publisher key and uses the same public manifests, checks the
 channel and semantic version, verifies the signed digest before offering an
 update, then verifies downloaded bytes before staging. Restart remains explicit.
-Disabling automatic downloads keeps version checks active. Dev builds never
+Disabling automatic downloads keeps version checks active. Unpublished local builds never
 replace themselves. Test a real upgrade separately from provider/fixture tests.
+Users of 0.0.1 must manually install 0.0.2 or later once to switch to the new
+public update source.
