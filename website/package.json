@@ -1,10 +1,11 @@
 {
   "name": "linkport-website",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "description": "Linkport 项目说明网站",
   "scripts": {
-    "dev": "python3 -m http.server 4173 --bind 127.0.0.1 --directory dist",
-    "check": "node --check dist/app.js"
+    "dev": "node dev.mjs",
+    "build": "node build.mjs",
+    "check": "node --test test/*.test.mjs"
   }
 }

@@ -11,7 +11,10 @@ id linkport-relay >/dev/null 2>&1 || useradd --system --no-create-home --shell /
 install -m 0755 linkport-relay /usr/local/bin/linkport-relay
 install -m 0644 linkport-relay.service /etc/systemd/system/linkport-relay.service
 install -d -m 0755 /var/www/linkport/.well-known/acme-challenge
-install -m 0644 relay-directory.json /var/www/linkport/relay-directory.json
+# Optional compatibility file for desktop builds predating GitHub distribution.
+if [ -f relay-directory.json ]; then
+  install -m 0644 relay-directory.json /var/www/linkport/relay-directory.json
+fi
 install -m 0644 nginx-http.conf /etc/nginx/sites-available/linkport-http
 ln -sfn /etc/nginx/sites-available/linkport-http /etc/nginx/sites-enabled/linkport-http
 if [ -L /etc/nginx/sites-enabled/default ]; then unlink /etc/nginx/sites-enabled/default; fi

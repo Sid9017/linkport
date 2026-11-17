@@ -14,6 +14,11 @@ import (
 )
 
 func (n *Network) loadManagedCatalog(directory string) error {
+	if relaycatalog.SourceURL == "" {
+		var err error
+		n.catalog, err = relaycatalog.Verify(relaycatalog.Bootstrap, relaycatalog.PublicKey, time.Now())
+		return err
+	}
 	n.catalogPath = filepath.Join(directory, "relay-directory.json")
 	f, err := os.Open(n.catalogPath)
 	var raw []byte
@@ -71,6 +76,9 @@ func managedRelayMode(urls []string) relay.Mode {
 // cannot substitute its own verification key or lower the persisted version.
 // Existing endpoints are retained; independent serial streams are not replayed.
 func (n *Network) ApplyRelayCatalog(raw []byte) error {
+	if relaycatalog.SourceURL == "" {
+		return errors.New("relay directory is bundled with this application; update the application to change relays")
+	}
 	next, err := relaycatalog.Verify(raw, relaycatalog.PublicKey, time.Now())
 	if err != nil {
 		return err

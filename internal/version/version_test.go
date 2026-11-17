@@ -13,10 +13,10 @@ func TestDefaultVersionMatchesReleaseVersion(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if expected := strings.TrimSpace(string(content)); Version != expected {
+	if expected := strings.TrimSpace(string(content)) + "-dev"; Version != expected {
 		t.Fatalf("default Version = %q; VERSION = %q", Version, expected)
 	}
-	if Commit != "unknown" || Date != "unknown" {
+	if Channel != "dev" || Commit != "unknown" || Date != "unknown" {
 		t.Fatalf("unlinked build claims metadata: commit=%q date=%q", Commit, Date)
 	}
 }
@@ -27,7 +27,7 @@ func TestStringIncludesInjectedMetadata(t *testing.T) {
 		Version, Commit, Date = originalVersion, originalCommit, originalDate
 	})
 	Version, Commit, Date = "0.0.1", "0123456789abcdef", "2026-11-16T00:00:00Z"
-	expected := "0.0.1 (commit 0123456789abcdef, built 2026-11-16T00:00:00Z)"
+	expected := "0.0.1 [dev] (commit 0123456789abcdef, built 2026-11-16T00:00:00Z)"
 	if actual := String(); actual != expected {
 		t.Fatalf("String() = %q; want %q", actual, expected)
 	}
@@ -37,13 +37,14 @@ func TestLinkerMetadata(t *testing.T) {
 	const commit = "0123456789abcdef"
 	const date = "2026-11-16T00:00:00Z"
 	if os.Getenv("LINKPORT_TEST_LINKED_METADATA") == "1" {
-		if Version != "0.0.2" || Commit != commit || Date != date {
+		if Version != "0.0.2" || Channel != "stable" || Commit != commit || Date != date {
 			t.Fatalf("linker metadata = %q %q %q", Version, Commit, Date)
 		}
 		return
 	}
 	binary := filepath.Join(t.TempDir(), "version.test.exe")
 	flags := "-X github.com/Sid9017/linkport/internal/version.Version=0.0.2" +
+		" -X github.com/Sid9017/linkport/internal/version.Channel=stable" +
 		" -X github.com/Sid9017/linkport/internal/version.Commit=" + commit +
 		" -X github.com/Sid9017/linkport/internal/version.Date=" + date
 	build := exec.Command("go", "test", "-mod=readonly", "-c", "-ldflags", flags, "-o", binary, ".")

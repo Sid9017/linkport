@@ -3,11 +3,12 @@ package version
 import "fmt"
 
 var (
-	Version = "0.0.1"
+	Version = "0.0.2-dev"
+	Channel = "dev"
 	Commit  = "unknown"
 	Date    = "unknown"
 )
 
 func String() string {
-	return fmt.Sprintf("%s (commit %s, built %s)", Version, Commit, Date)
+	return fmt.Sprintf("%s [%s] (commit %s, built %s)", Version, Channel, Commit, Date)
 }

@@ -16,6 +16,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"github.com/Sid9017/linkport/internal/relaycatalog"
 	"github.com/Sid9017/linkport/internal/relayservice"
@@ -28,7 +29,10 @@ import (
 	"github.com/tmc/go-iroh/relay"
 )
 
-const ALPN = "linkport/1"
+const (
+	ALPN               = "linkport/1"
+	invitationLifetime = 8 * time.Hour
+)
 
 type Options struct {
 	Directory string
@@ -45,6 +49,7 @@ type Status struct {
 	Ticket                string                  `json:"ticket"`
 	HomeRelay             string                  `json:"homeRelay,omitempty"`
 	RelayConnected        bool                    `json:"relayConnected"`
+	RelayError            string                  `json:"relayError,omitempty"`
 	Config                NetworkConfig           `json:"config"`
 	RestartRequired       bool                    `json:"restartRequired"`
 	Error                 string                  `json:"error,omitempty"`
@@ -207,10 +212,13 @@ func (n *Network) Status() Status {
 	}
 	if n.endpoint != nil && !n.stopped {
 		state.State = "Running"
-		state.Ticket = endpointticket.Encode(n.endpoint.Addr())
+		state.Ticket = endpointticket.Encode(n.contactAddress())
 		if home := n.endpoint.HomeRelayStatus().Current(); home != nil {
 			state.HomeRelay = home.URL.String()
 			state.RelayConnected = home.IsConnected()
+			if !state.RelayConnected && home.LastError != nil {
+				state.RelayError = home.LastError.Error()
+			}
 		}
 	}
 	if n.restart {
@@ -524,7 +532,7 @@ func (n *Network) AfterHandshake(_ context.Context, conn *iroh.Conn) error {
 func (n *Network) self() Peer {
 	return Peer{
 		ID: n.endpoint.ID().String(), HostName: n.store.Name(),
-		Ticket: endpointticket.Encode(n.endpoint.Addr()),
+		Ticket: endpointticket.Encode(n.contactAddress()),
 	}
 }
 
@@ -539,7 +547,7 @@ func (n *Network) CreateInvitation() (Invitation, error) {
 		return Invitation{}, err
 	}
 	token := base64.RawURLEncoding.EncodeToString(random[:])
-	expires := time.Now().UTC().Add(5 * time.Minute)
+	expires := time.Now().UTC().Add(invitationLifetime)
 	payload := invitePayload{Version: 1, Peer: n.self(), Token: token, Expires: expires}
 	data, err := json.Marshal(payload)
 	if err != nil {
@@ -555,23 +563,36 @@ func parseInvitation(code string) (invitePayload, error) {
 	if len(code) > 24*1024 {
 		return payload, errors.New("配对邀请过长")
 	}
-	raw, ok := strings.CutPrefix(strings.TrimSpace(code), "linkport1.")
+	// Messaging apps can insert wrapping whitespace or invisible separators.
+	// Remove only formatting: never guess missing characters or change the
+	// encoded bytes, token, identity, or authorization checks.
+	code = strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) || r == '\u200b' || r == '\u2060' || r == '\ufeff' {
+			return -1
+		}
+		return r
+	}, code)
+	raw, ok := strings.CutPrefix(code, "linkport1.")
 	if !ok {
-		return payload, errors.New("无效的 Linkport 配对邀请")
+		return payload, errors.New("配对邀请应以 linkport1. 开头，请完整复制另一台设备的邀请")
 	}
 	data, err := base64.RawURLEncoding.DecodeString(raw)
 	if err != nil {
-		return payload, errors.New("无效的 Linkport 配对邀请")
+		return payload, errors.New("配对邀请编码不完整或含有多余字符，请使用复制邀请按钮后重新粘贴")
 	}
 	if err := decodeOne(bytes.NewReader(data), &payload); err != nil {
-		return payload, errors.New("无效的 Linkport 配对邀请")
+		return payload, errors.New("配对邀请内容不完整或格式错误，请完整复制后重试")
 	}
 	token, err := base64.RawURLEncoding.DecodeString(payload.Token)
 	if err != nil || len(token) != 32 || payload.Version != 1 {
 		return payload, errors.New("无效的配对密钥或版本")
 	}
-	if !time.Now().Before(payload.Expires) || time.Until(payload.Expires) > 6*time.Minute {
+	now := time.Now()
+	if !now.Before(payload.Expires) {
 		return payload, errors.New("配对邀请已过期，请在另一台机器重新生成")
+	}
+	if payload.Expires.After(now.Add(invitationLifetime + time.Minute)) {
+		return payload, errors.New("配对邀请有效期异常，请检查两台机器的系统时间后重新生成")
 	}
 	if _, err := validatePeer(payload.Peer); err != nil {
 		return payload, err
@@ -620,6 +641,15 @@ func (n *Network) AddDevice(ctx context.Context, code string) (Peer, error) {
 	}
 	response, err := client.Do(request)
 	if err != nil {
+		if len(addr.IPAddrs()) == 0 {
+			state := n.Status()
+			if state.Config.RelayMode == "disabled" {
+				return Peer{}, errors.New("邀请仅包含中继地址，当前为仅直连模式；请切换公共中继并重启后重试")
+			}
+			if !state.RelayConnected {
+				return Peer{}, errors.New("邀请格式正确，但尚未连接公共中继；请检查网络设置中的中继连接状态后重试")
+			}
+		}
 		return Peer{}, fmt.Errorf("无法联系邀请设备：%w", err)
 	}
 	defer response.Body.Close()

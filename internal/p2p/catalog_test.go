@@ -34,10 +34,13 @@ func TestManagedCatalogPersistenceAndPolicy(t *testing.T) {
 		}
 		return raw
 	}
-	oldKey, oldBootstrap := relaycatalog.PublicKey, relaycatalog.Bootstrap
+	oldKey, oldBootstrap, oldSource := relaycatalog.PublicKey, relaycatalog.Bootstrap, relaycatalog.SourceURL
 	relaycatalog.PublicKey = base64.StdEncoding.EncodeToString(public)
 	relaycatalog.Bootstrap = sign(1, now.Add(time.Hour), "https://207.148.110.58")
-	defer func() { relaycatalog.PublicKey, relaycatalog.Bootstrap = oldKey, oldBootstrap }()
+	relaycatalog.SourceURL = "https://example.com/relay-directory.json"
+	defer func() {
+		relaycatalog.PublicKey, relaycatalog.Bootstrap, relaycatalog.SourceURL = oldKey, oldBootstrap, oldSource
+	}()
 	directory := t.TempDir()
 	store, err := OpenStore(directory)
 	if err != nil {
@@ -191,4 +194,70 @@ func TestManagedCatalogPersistenceAndPolicy(t *testing.T) {
 		t.Fatal("updated directory lost a parked relay")
 	}
 
+}
+
+func TestBundledCatalogIgnoresCacheAndRejectsRuntimeUpdates(t *testing.T) {
+	public, private, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	sign := func(version uint64, urls ...string) []byte {
+		t.Helper()
+		raw, err := relaycatalog.Sign(relaycatalog.Manifest{
+			Format: 1, Version: version, PublishedAt: now.Add(-time.Hour),
+			ExpiresAt: now.Add(time.Hour), Relays: urls,
+		}, private)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return raw
+	}
+	oldKey, oldBootstrap, oldSource := relaycatalog.PublicKey, relaycatalog.Bootstrap, relaycatalog.SourceURL
+	relaycatalog.PublicKey = base64.StdEncoding.EncodeToString(public)
+	relaycatalog.Bootstrap = sign(1, "https://207.148.110.58")
+	relaycatalog.SourceURL = ""
+	defer func() {
+		relaycatalog.PublicKey, relaycatalog.Bootstrap, relaycatalog.SourceURL = oldKey, oldBootstrap, oldSource
+	}()
+	newer := sign(2, "https://1.1.1.1")
+	for _, test := range []struct {
+		name string
+		raw  []byte
+	}{
+		{"newer signed cache", newer},
+		{"damaged legacy cache", []byte("incomplete directory")},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			directory := t.TempDir()
+			path := filepath.Join(directory, "relay-directory.json")
+			if err := os.WriteFile(path, test.raw, 0600); err != nil {
+				t.Fatal(err)
+			}
+			n, err := New(t.Context(), Options{Directory: directory, Disabled: true})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer n.Close()
+			identity := n.Status().NodeID
+			if err := n.ApplyRelayCatalog(newer); err == nil {
+				t.Fatal("bundled configuration accepted a runtime relay update")
+			}
+			status := n.Status()
+			if status.RelayDirectoryVersion != 1 || len(status.PublicRelays) != 1 || status.PublicRelays[0] != "https://207.148.110.58" {
+				t.Fatalf("legacy cache overrode bundled relay: %+v", status.PublicRelays)
+			}
+			if status.NodeID != identity {
+				t.Fatal("rejected relay update changed device identity")
+			}
+			persisted, err := os.ReadFile(path)
+			if err != nil || string(persisted) != string(test.raw) {
+				t.Fatal("bundled configuration overwrote the legacy cache", err)
+			}
+		})
+	}
+	relaycatalog.Bootstrap = []byte(`{}`)
+	if _, err := New(t.Context(), Options{Directory: t.TempDir(), Disabled: true}); err == nil {
+		t.Fatal("bundled configuration bypassed operator signature verification")
+	}
 }

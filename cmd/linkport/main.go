@@ -72,7 +72,7 @@ func run(ctx context.Context, args []string, output, errorOutput io.Writer) erro
 }
 
 func printHelp(output io.Writer) {
-	fmt.Fprintln(output, `Linkport 0.0.1 — serial sharing framework and desktop design preview
+	fmt.Fprintf(output, `Linkport %s — serial sharing between paired devices
 
 Usage:
   linkport version
@@ -93,10 +93,11 @@ Usage:
 
 All ports start unshared. watch emits shared-port snapshots as JSON.
 serve runs authenticated iroh sharing for explicitly paired devices.
-invite prints a five-minute single-use invitation and stays online for pairing.
+invite prints an eight-hour single-use invitation and stays online for pairing.
 identity --reset --confirm DEVICE_ID clears trusted devices and generates a new key.
 serve --local-api exposes read-only snapshots and SSE on loopback for development.
-The browser design preview uses demo data. The native Wails host uses real data.`)
+The browser design preview uses demo data. The native Wails host uses real data.
+`, version.Version)
 }
 
 func runLocal(ctx context.Context, args []string, output, errorOutput io.Writer) error {

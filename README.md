@@ -11,7 +11,7 @@ The desktop app includes a serial monitor, text and HEX sending, and independent
 sessions for multiple ports. A headless CLI runs the sharing service on machines
 without a desktop.
 
-**Status:** 0.0.1 development preview. Windows, macOS, and Linux are target
+**Status:** 0.0.2 early release series with Stable, Nightly and Dev channels. Windows, macOS, and Linux are target
 platforms. Automated tests exercise encrypted loopback connections and isolated
 serial fixtures; real hardware, drivers, and cross-network behavior still need
 validation in their target environments.
@@ -66,7 +66,7 @@ release work.
 1. Start Linkport on both machines.
 2. On one machine, open **Add device** and generate a pairing invitation.
 3. Transfer the complete invitation through a trusted channel and import it on
-   the other machine. Invitations expire after five minutes and can be used once.
+   the other machine. Invitations expire after eight hours and can be used once.
 4. On the machine with the hardware, explicitly enable sharing for the desired
    serial port.
 5. On the other machine, select the paired device, shared port, and serial
@@ -144,27 +144,28 @@ Clients support two network modes:
 
 | Mode | Relay behavior | Address discovery |
 | --- | --- | --- |
-| `default` | Operator-signed Linkport relay directory | Paired-device exchange, public lookup, and LAN discovery |
+| `default` | Bundled, operator-signed Tokyo relay | Paired-device exchange, public lookup, and LAN discovery |
 | `disabled` | No relay | No public discovery; direct addresses and LAN discovery |
 
-Public relay addresses cannot be edited by end users. The embedded directory
-currently includes `https://207.148.110.58` in Tokyo. Its signed JSON is served at
-`https://207.148.110.58/relay-directory.json`; desktop verifies the embedded operator
-key and monotonic version before applying a directory update. Legacy custom
-configuration migrates to the maintained defaults without replacing device identity
-or pairings. Peer advertisements cannot add arbitrary outbound relay candidates.
+Public relay addresses cannot be edited by end users. This build pins the relay
+set to the bundled signed directory containing only `https://207.148.110.58`
+in Tokyo. It verifies the embedded operator signature, ignores legacy directory
+caches and does not fetch a remote relay list. Node additions and removals
+require an application update for now. Legacy custom configuration migrates
+to the maintained defaults without replacing device identity or pairings.
+Peer advertisements cannot add arbitrary outbound relay candidates.
+See [directory maintenance](docs/relay-directory.md) for the current policy.
 
 ```sh
 go run ./cmd/linkport network --relay-mode default
 go run ./cmd/linkport network --relay-mode disabled
 ```
 
-Desktop checks for both application and relay-directory updates, displays an update
-badge, and automatically downloads signed application updates or applies verified
-relay directories when background updates are enabled. Application installation
-still requires an explicit restart. Turning automatic updates off keeps checks and
-manual actions available. Failed directory checks preserve the last working set;
-direct-only mode stays disabled when a new directory is cached.
+Desktop checks for application updates, displays an update badge, and automatically
+downloads signed application updates when background updates are enabled.
+Application installation still requires an explicit restart. Turning automatic
+updates off keeps application checks and manual actions available. Relay settings
+show “Updated with the app”; there is no separate relay-list check or apply action.
 
 The relay module remains reusable by operator code and the standalone command;
 ordinary desktop users cannot configure a public relay listener. Deployment and
@@ -248,9 +249,10 @@ Actual com0com driver tests require a dedicated runner and manual dispatch.
 
 Build CLI archives with `python3 scripts/release.py`; validate the packaging
 script with `python3 scripts/release.py --self-test`. Desktop packages use
-`scripts/desktop.py`. Release automation creates draft prereleases. Signed updates
-require configured release signing keys; development packages without an embedded
-update-verification key do not install updates automatically. See the
+`scripts/desktop.py`. Release automation publishes complete signed Stable releases and Nightly prereleases
+after full checks. Dev archives carry a commit identity and never update themselves.
+Public downloads and channel-specific update manifests are served from
+`https://linkport.grezl.link`; the source repository can remain private. See the
 [release guide](docs/releasing.md).
 
 ## Documentation

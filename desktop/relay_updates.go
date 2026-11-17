@@ -25,6 +25,7 @@ type relayUpdateController struct {
 	network  *p2p.Network
 	settings *preferenceStore
 	client   *http.Client
+	source   string
 	mu       sync.Mutex
 	status   relayUpdateStatus
 	pending  []byte
@@ -32,7 +33,11 @@ type relayUpdateController struct {
 }
 
 func newRelayUpdateController(ctx context.Context, network *p2p.Network, settings *preferenceStore) *relayUpdateController {
-	return &relayUpdateController{ctx: ctx, network: network, settings: settings, status: relayUpdateStatus{State: "idle", Version: network.Status().RelayDirectoryVersion}, client: &http.Client{Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}
+	state := "idle"
+	if relaycatalog.SourceURL == "" {
+		state = "bundled"
+	}
+	return &relayUpdateController{ctx: ctx, network: network, settings: settings, source: relaycatalog.SourceURL, status: relayUpdateStatus{State: state, Version: network.Status().RelayDirectoryVersion}, client: &http.Client{Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}
 }
 func (c *relayUpdateController) snapshot() relayUpdateStatus {
 	if c == nil {
@@ -45,6 +50,9 @@ func (c *relayUpdateController) snapshot() relayUpdateStatus {
 func (c *relayUpdateController) check() error {
 	if c == nil {
 		return errors.New("relay updates unavailable")
+	}
+	if c.source == "" {
+		return nil
 	}
 	c.mu.Lock()
 	if c.busy {
@@ -72,12 +80,17 @@ func (c *relayUpdateController) check() error {
 	return nil
 }
 func (c *relayUpdateController) fetch() error {
+	if c.source == "" {
+		return nil
+	}
 	ctx, cancel := context.WithTimeout(c.ctx, 20*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, relaycatalog.SourceURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.source, nil)
 	if err != nil {
 		return err
 	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Cache-Control", "no-cache")
 	response, err := c.client.Do(req)
 	if err != nil {
 		return err
@@ -138,6 +151,9 @@ func (c *relayUpdateController) apply() error {
 	if c == nil {
 		return errors.New("relay updates unavailable")
 	}
+	if c.source == "" {
+		return errors.New("relay configuration is updated with the application")
+	}
 	c.mu.Lock()
 	busy := c.busy
 	c.mu.Unlock()
@@ -147,6 +163,9 @@ func (c *relayUpdateController) apply() error {
 	return c.applyPending()
 }
 func (c *relayUpdateController) start() {
+	if c.source == "" {
+		return
+	}
 	go func() {
 		defer c.client.CloseIdleConnections()
 		timer := time.NewTimer(30 * time.Second)

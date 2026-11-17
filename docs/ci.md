@@ -31,7 +31,7 @@ downloads are both retained.
 `windows.yml`, `linux.yml`, and `macos.yml` call `platform.yml` to keep shared
 steps consistent. Native and frontend jobs remain independent. In the full
 profile both must pass before `desktop.yml` tests and builds that platform's
-two desktop archives. The draft release waits for all three platforms and their
+two desktop archives. Release publication waits for all three platforms and their
 packages. Reusable calls pass the profile explicitly; they do not infer it from
 the caller's event name.
 
@@ -189,11 +189,25 @@ These tests stay in the existing jobs and do not change the routine CI profile.
 ### Managed relay directory and explicit public acceptance
 
 Normal tests do not contact the deployed public relay. `TestManagedCatalogPersistenceAndPolicy`
-checks migration without replacing identity, signed version persistence, rollback/conflict/expiry
+explicitly enables the retained remote-directory implementation and checks migration
+without replacing identity, signed version persistence, rollback/conflict/expiry
 rejection, peer relay filtering, direct-only preservation, and cache write failure. Desktop tests
 check manual versus automatic directory application, redirects, offline preservation, and native
-token protection. Chromium fixtures check the update badge and that custom relay controls are absent.
+token protection. The current bundled configuration additionally checks that newer or
+damaged legacy caches cannot override its relay, signatures remain required, runtime
+updates are rejected, and the desktop performs no directory requests. Chromium fixtures
+check “Updated with the app”, the hidden relay update action, the retained application
+update badge, and that custom relay controls are absent.
 
 The operator can explicitly run `TestPublicRelayDeployment` by setting
 `LINKPORT_TEST_PUBLIC_RELAY=https://207.148.110.58`. Use temporary identities and no serial hardware;
 see [the deployment report](relay-deployment.md) for the actual November 17 results and network limits.
+
+Invitation regressions cover eight-hour lifetime, compatibility with short-lived
+invitations, copy-induced formatting, precise safe errors, and single-use
+authorization after normalization. Contact candidate tests cover identity and
+relay preservation, address filtering, socket family and bounded lists.
+`TestWildcardBoundEndpointsPairWithoutRelay` pairs two real local UDP endpoints
+through interface candidates with public discovery, STUN and relays disabled.
+It explicitly skips if the host has no usable LAN interface; the pure filtering
+tests still run. It does not open serial devices or contact the public relay.

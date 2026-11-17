@@ -1,173 +1,120 @@
-# Releasing the framework preview
+# Versioning, packages and publication
 
-v0.0.1 is an early framework and design review preview, not a completed serial
-application or a production desktop release. The archives contain the
-`cmd/linkport` executable, `VERSION`, `CHANGELOG.md`, `README.md`, and the Geist
-font license. The design preview and font assets are embedded in the command
-and available with `linkport design`. Desktop designs and prototypes are review
-material. A separate Wails build now packages a native macOS `.app` and
-Windows/Linux desktop executables. Native desktops use real paired-device/serial
-providers and a real data bridge; only the separate design preview uses fixtures.
-Validate physical devices, two-machine networking, and platform drivers in the
-target environment before treating the development release as production-ready.
-
-## Version and metadata
-
-Keep `VERSION` and the default `internal/version.Version` at `0.0.1` for this
-preview. A release tag must be exactly `v` followed by `VERSION`. Validation also
-requires the existing local tag to resolve to HEAD and a clean checkout.
-Plain `go build` defaults to version `0.0.1`, commit `unknown`, and date `unknown`.
-The command can display `version.String()` or the individual exported fields.
-
-The packager injects these Go string variables with linker `-X`:
-
-```text
-github.com/Sid9017/linkport/internal/version.Version
-github.com/Sid9017/linkport/internal/version.Commit
-github.com/Sid9017/linkport/internal/version.Date
-```
-
-`Commit` is the full HEAD hash, with `-dirty` appended for local modified sources.
-`Date` is UTC RFC3339, derived from the commit timestamp, or `SOURCE_DATE_EPOCH`
-when explicitly supplied. Tagged builds should leave `SOURCE_DATE_EPOCH` unset
-to use the same commit timestamp on every runner.
-
-## Local build and checks
-
-Run from the repository root with Git, the Go toolchain specified by `go.mod`,
-and Python 3.11 or later. macOS also needs Xcode Command Line Tools and its SDK.
-The script uses only the Python standard library and sets
-`GOCACHE=/tmp/linkport-gocache` for Go builds (an absolute native equivalent,
-such as `C:\tmp\linkport-gocache`, on Windows).
+`VERSION` contains the next base semantic version. `internal/version.Version`
+defaults to that base followed by `-dev`, and `website/package.json` carries the
+same base. Use the shared command instead of editing these values separately:
 
 ```sh
-export GOCACHE=/tmp/linkport-gocache
+python3 scripts/version.py patch
+# Also supports minor and major. Review the new CHANGELOG section, then commit.
+```
+
+## Channels
+
+| Channel | Version and tag | Distribution and updates |
+| --- | --- | --- |
+| Stable | `0.0.2`, tag `v0.0.2` | Published GitHub release; only newer Stable updates |
+| Nightly | `0.0.2-nightly.YYYYMMDDHHMMSS.RUN`, matching `v` tag | Prerelease; only newer Nightly updates |
+| Dev | `0.0.2-dev.EPOCH.gCOMMIT[.dirty]` | Local/CI test archives; no automatic update checks |
+
+A plain `go build` reports the base `-dev` version with unknown commit/date.
+Packagers inject `Version`, `Channel`, `Commit` and `Date` in
+`github.com/Sid9017/linkport/internal/version`. Tagged packages require a clean
+checkout and a tag resolving to HEAD. Existing tags and published assets are
+not overwritten. Changes after publication require another version.
+
+Nightly runs daily at 18:00 UTC (02:00 Asia/Shanghai the following day), or on
+manual dispatch. It uses `main`, skips an unchanged commit, creates an immutable
+tag and calls the same release workflow. Routine PR/main compatibility checks
+still use five jobs. Website and version-tool tests share the existing Linux
+backend job. Releases use the full six-target native profile.
+
+## Local builds
+
+Use the pinned Go toolchain and Python 3.11 or later. macOS requires the native
+SDK and cgo; Linux desktop requires GTK 4 and WebKitGTK 6. These commands create
+Dev packages by default:
+
+```sh
 python3 scripts/release.py --validate-only
 python3 scripts/release.py --self-test
-go test -count=1 -timeout=5m ./...
-python3 scripts/release.py
+python3 scripts/release.py --output dist/cli-dev
+python3 scripts/desktop.py --output dist/desktop-dev
 ```
 
-On Windows, use `python` if `python3` is unavailable, and set
-`$env:GOCACHE = 'C:\tmp\linkport-gocache'` in PowerShell before running Go tests.
+Names identify both program and complete version:
+`linkport-desktop_VERSION_GOOS_GOARCH.zip` for desktop;
+`linkport_VERSION_GOOS_GOARCH.tar.gz` for Unix CLI or `.zip` for Windows CLI.
+Archives include `VERSION`, `CHANNEL`, documentation and dependency licenses.
+The native executable retains its normal name. macOS bundle numeric versions
+use the base version; the app, updater and archive show the complete version.
 
-The packager builds `./cmd/linkport` for the native host only and produces one
-archive plus `dist/checksums.txt`. `--target darwin_arm64`, for example, asserts
-the host platform; it does not cross compile. Use a fresh output directory per
-version; unrelated archives are rejected. `dist/` is ignored by Git.
+`--target` asserts the native host; it does not cross compile. macOS/Linux/Windows
+amd64 and arm64 packages are built on their target native runners. Archive
+ordering, permissions, timestamps and ownership are normalized. Reproducibility
+requires the same compilers, SDKs and compression libraries. Packages retain the
+existing app identity/configuration, so replacing a channel preserves pairings.
+Do not run two channels simultaneously against the same configuration.
 
-Names are `linkport_0.0.1_<GOOS>_<GOARCH>.tar.gz`, or `.zip` on Windows.
-Each archive contains a root-level executable (`linkport.exe` on Windows).
-Tar owners, modes, ordering, gzip headers, and ZIP timestamps/modes are
-normalized; the binary uses `-trimpath`, `-buildvcs=false`, and a blank build ID.
-Repeatability assumes identical source, metadata, Go/Python/zlib versions,
-native compiler, SDK, and build environment. Hosted runner image revisions are
-not frozen, so byte identity across runner upgrades is not guaranteed.
-Local modified sources carry the `-dirty` suffix and are not release inputs.
+## Stable release
 
-To inject metadata directly, for example on a native Mac:
+After reviewing changes and passing checks, commit the release sources, then:
 
 ```sh
-GOCACHE=/tmp/linkport-gocache CGO_ENABLED=1 go build -mod=readonly -trimpath -buildvcs=false \
-  -ldflags="-s -w -buildid= -X github.com/Sid9017/linkport/internal/version.Version=0.0.1 -X github.com/Sid9017/linkport/internal/version.Commit=$(git rev-parse HEAD) -X github.com/Sid9017/linkport/internal/version.Date=$(git show -s --format=%cI HEAD)" \
-  -o /tmp/linkport ./cmd/linkport
+git tag v0.0.2
+git push origin v0.0.2
 ```
 
-## CI and native platforms
-
-Pull requests and `main` pushes run five routine jobs across separate Windows,
-Linux and macOS workflows. Root tests include virtual ports, desktop module
-tests share the native job, and Linux/Windows frontend checks remain separate.
-Feature-branch pushes do not duplicate PR checks; superseded PR runs are canceled.
-The release workflow calls `ci.yml`, which explicitly selects full validation
-on all six native targets and packages both desktop architectures per platform.
-The same full profile can be dispatched manually without creating a release.
-Only the final draft job gets `contents: write`. Coverage and driver-runner
-configuration are documented in [ci.md](ci.md).
-
-| GOOS | GOARCH | GitHub runner | CLI cgo |
-| --- | --- | --- | --- |
-| darwin | arm64 | `macos-15` | enabled |
-| darwin | amd64 | `macos-15-intel` | enabled |
-| linux | amd64 | `ubuntu-24.04` | disabled |
-| linux | arm64 | `ubuntu-24.04-arm` | disabled |
-| windows | amd64 | `windows-2022` | disabled |
-| windows | arm64 | `windows-11-arm` | disabled |
-
-Runner labels checked against GitHub's primary documentation on November 16,
-2026:
-
-- https://docs.github.com/en/actions/reference/runners/github-hosted-runners
-- https://github.com/actions/runner-images
-- https://github.com/actions/runner-images/issues/13518
-
-GitHub retired macOS 14 runners on November 2, 2026. `macos-15` is the native
-arm64 replacement; `macos-15-intel` builds amd64. Native macOS builds keep cgo
-enabled for detailed serial enumeration through IOKit. Do not replace these
-with Linux cross builds or disable cgo to make a build pass.
-Unix backend tests enable cgo for the race detector; Linux CLI archives
-continue to use `CGO_ENABLED=0`.
-
-Windows virtual ports require a compatible, preinstalled com0com driver and an
-existing port pair. The driver and its installer are not bundled. Hosted CI
-tests the Windows adapter and decoder without installing a driver. The separate
-`com0com.yml` workflow can test a real pair on a configured dedicated Windows
-x64 runner when manually dispatched; it is not a default release gate.
-Windows arm64 driver availability remains unverified. CLI macOS archives are
-unsigned; desktop apps have an ad-hoc signature. Neither is notarized. Hardware
-and native desktop usability need separate validation.
-
-## Draft release procedure
-
-Each platform workflow calls `desktop.yml` in the full profile, building with
-Go 1.26.11. Routine PR checks do not create downloadable archives.
-Desktop artifacts live under `dist/desktop` and use ZIP on each platform.
-`desktop-checksums.txt` lists only the six desktop ZIP filenames, matching the
-updater provider. With both update signing secrets configured, the release job
-adds an Ed25519 `.sig` file for each ZIP. Without keys it creates a draft
-without enabling automatic installation. See `docs/desktop.md` before
-configuring keys or enabling public updates.
-
-No command below creates or pushes a tag. A maintainer must have separately
-reviewed the design/status notes, committed the release sources, and made the
-existing `v0.0.1` tag available on GitHub. `gh --verify-tag` prevents accidental
-tag creation. No workflow publishes the draft.
-
-For an existing tag, the tag push event triggers `release.yml`. Alternatively,
-dispatch it after the reviewed workflow is on the default branch:
+The tag event runs `release.yml`. An existing reviewed tag can also be dispatched:
 
 ```sh
-gh workflow run release.yml -f tag=v0.0.1
+gh workflow run release.yml -f tag=v0.0.2
 ```
 
-This is a GitHub write: run it only when ready to create a draft. Dispatch
-requires the workflow on the default branch. The workflow checks out the tag,
-validates its version and commit, runs the six-platform tests/builds, checks
-that exactly six expected archives exist, generates `checksums.txt`, verifies
-those hashes, and invokes `gh release create --draft --prerelease` with all
-seven assets and `CHANGELOG.md` as the preview notes. An existing release causes
-creation to fail; inspect it before deciding how to retry.
+The workflow validates the version and tag, runs full root/desktop/frontend
+checks, builds twelve native packages, checks the expected filename sets,
+generates CLI and desktop SHA-256 lists and signs every archive. Both
+`LINKPORT_UPDATE_PRIVATE_KEY` and `LINKPORT_UPDATE_PUBLIC_KEY` are mandatory;
+a missing or mismatched signing key fails publication. Private keys reach only
+the final signing job, never platform build jobs or the website.
 
-To collect native archives manually, copy all six into a clean ignored `dist/`
-directory in the clean tagged checkout, then run:
+A draft is assembled first and published only after every archive, checksum
+and signature has uploaded. Stable becomes the latest release; Nightly is a
+prerelease and never replaces Stable as latest. Notes come from the current
+base version's CHANGELOG section. A failed partial draft stays unpublished;
+inspect it before retrying. No installer is offered from a CI artifact page.
 
-```sh
-python3 scripts/release.py --checksums-only --require-all --tag v0.0.1
-(cd dist && shasum -a 256 -c checksums.txt)
-gh release create v0.0.1 \
-  dist/linkport_0.0.1_darwin_amd64.tar.gz \
-  dist/linkport_0.0.1_darwin_arm64.tar.gz \
-  dist/linkport_0.0.1_linux_amd64.tar.gz \
-  dist/linkport_0.0.1_linux_arm64.tar.gz \
-  dist/linkport_0.0.1_windows_amd64.zip \
-  dist/linkport_0.0.1_windows_arm64.zip \
-  dist/checksums.txt \
-  --verify-tag --draft --prerelease \
-  --title "linkport v0.0.1 — framework preview" \
-  --notes-file CHANGELOG.md
-```
+These are early 0.0.x releases. macOS bundles have ad-hoc signing, without Apple
+notarization. Windows Authenticode/com0com driver verification and physical
+USB/cross-network tests are distinct from package signatures and native CI.
 
-Use `sha256sum --check checksums.txt` on Linux, or `Get-FileHash -Algorithm SHA256`
-to compare archive digests on Windows. Checksums detect changed downloads; they
-are not signatures. Review the draft assets and notes before any later,
-separately authorized publication.
+## Public downloads with private source
+
+The existing `Sid9017/linkport` source and Release storage remain private.
+Netlify serves the website and the release gateway at `linkport.grezl.link`:
+
+- `/api/releases`: published Stable/Nightly versions and desktop/CLI downloads.
+- `/updates/stable.json` and `/updates/nightly.json`: Wails endpoint manifests.
+- `/downloads/TAG/FILENAME`: allowlisted package, checksum or signature assets.
+
+Configure `LINKPORT_GITHUB_TOKEN` in the Netlify project's runtime environment:
+use a dedicated token restricted to this repository with read-only Contents
+permission. It is server-only and must never be placed in source or client
+bundles. Link the existing repository to Netlify with publish directory
+`website/dist`; `netlify.toml` supplies build, functions and route configuration.
+An authorized Netlify GitHub App connection for builds does not by itself
+configure the function's separate runtime credential.
+
+The gateway ignores drafts and Dev tags, checks all six desktop checksums and
+signatures before advertising a release, and exposes only explicitly named
+package assets. GitHub download credentials never reach a client; authenticated
+asset requests yield temporary CDN redirects without forwarding the token.
+Unconfigured or failed backends return 503, and an unpublished channel returns
+204. The website shows unavailable/unpublished states rather than fabricated
+links. No repository visibility change or new repository is required.
+
+Desktop pins the publisher key and uses the same public manifests, checks the
+channel and semantic version, verifies the signed digest before offering an
+update, then verifies downloaded bytes before staging. Restart remains explicit.
+Disabling automatic downloads keeps version checks active. Dev builds never
+replace themselves. Test a real upgrade separately from provider/fixture tests.

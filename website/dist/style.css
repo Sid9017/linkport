@@ -482,3 +482,17 @@ h2 { font-size: clamp(28px, 2.8vw, 36px); line-height: 1.35; letter-spacing: -.0
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .wire-packet { display: none; }
 }
+.release-channels { display: flex; flex-wrap: wrap; gap: 8px; margin: 28px 0 12px; }
+.release-channels button { cursor: pointer; font: inherit; border: 1px solid #d7d7d7; background: transparent; color: #525252; border-radius: 7px; padding: 10px 15px; }
+.release-channels button[aria-pressed="true"] { background: #1b1b1b; color: #fff; border-color: #1b1b1b; }
+.release-channels button span { font-size: 11px; margin-left: 7px; opacity: .72; }
+.release-description { color: #666; font-size: 13px; line-height: 1.7; min-height: 24px; }
+.download-links a[aria-disabled="true"] { opacity: .4; cursor: default; pointer-events: none; }
+.download-note [data-checksums] { margin-left: 12px; }
+.docs-page { max-width: 820px; padding-block: 64px 100px; line-height: 1.85; }
+.docs-page h1 { font-size: clamp(30px, 6vw, 48px); margin-top: 38px; }
+.docs-page h2 { font-size: 22px; margin: 38px 0 12px; }
+.docs-page p, .docs-page li { color: #555; }
+.docs-page li { margin-block: 12px; }
+.docs-page code, .changelog { overflow-wrap: anywhere; white-space: pre-wrap; }
+.changelog { font-size: 13px; line-height: 1.9; background: #f1f1f1; padding: 24px; border-radius: 8px; }

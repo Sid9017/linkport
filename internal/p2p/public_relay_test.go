@@ -31,9 +31,16 @@ func TestPublicRelayDeployment(t *testing.T) {
 	}
 	client := &http.Client{Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	defer client.CloseIdleConnections()
-	for _, path := range []string{"/healthz", "/ping", "/relay-directory.json"} {
+	targets := []struct{ name, url string }{
+		{"health", address + "/healthz"},
+		{"ping", address + "/ping"},
+	}
+	if relaycatalog.SourceURL != "" {
+		targets = append(targets, struct{ name, url string }{"directory", relaycatalog.SourceURL})
+	}
+	for _, target := range targets {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, address+path, nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, target.url, nil)
 		if err != nil {
 			cancel()
 			t.Fatal(err)
@@ -47,21 +54,21 @@ func TestPublicRelayDeployment(t *testing.T) {
 		response.Body.Close()
 		cancel()
 		if readErr != nil || response.StatusCode != http.StatusOK {
-			t.Fatalf("%s: status=%d error=%v", path, response.StatusCode, readErr)
+			t.Fatalf("%s: status=%d error=%v", target.name, response.StatusCode, readErr)
 		}
 		if response.TLS == nil || len(response.TLS.VerifiedChains) == 0 {
 			t.Fatal("HTTPS did not verify a trusted certificate chain")
 		}
-		if path == "/healthz" && string(body) != "ok\n" {
+		if target.name == "health" && string(body) != "ok\n" {
 			t.Fatalf("unexpected health response %q", body)
 		}
-		if path == "/relay-directory.json" {
+		if target.name == "directory" {
 			directory, err := relaycatalog.Verify(body, relaycatalog.PublicKey, time.Now())
 			if err != nil {
 				t.Fatal(err)
 			}
 			if !directory.Fresh(time.Now()) {
-				t.Fatal("served relay directory expired")
+				t.Fatal("published relay directory expired")
 			}
 			found := false
 			for _, candidate := range directory.URLs() {
@@ -70,7 +77,7 @@ func TestPublicRelayDeployment(t *testing.T) {
 				}
 			}
 			if !found {
-				t.Fatal("served directory does not include tested relay")
+				t.Fatal("published directory does not include tested relay")
 			}
 		}
 	}

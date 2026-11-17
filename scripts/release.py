@@ -38,19 +38,29 @@ def read_version():
         raise ValueError("VERSION must be a plain major.minor.patch version")
     source = (ROOT / "internal/version/version.go").read_text(encoding="utf-8")
     default = re.search(r'\bVersion\s*=\s*"([^"]+)"', source)
-    if default is None or default.group(1) != version:
-        raise ValueError("VERSION and internal/version/version.go must agree")
+    if default is None or default.group(1) != version + "-dev":
+        raise ValueError("the Go default must be VERSION followed by -dev")
     return version
 
 
 def validate_tag(tag, version):
-    if tag != f"v{version}":
-        raise ValueError(f"tag must be v{version}, got {tag!r}")
+    if tag != f"v{version}" and not re.fullmatch(
+        rf"v{re.escape(version)}-nightly\.[0-9]{{14}}\.[1-9][0-9]*", tag
+    ):
+        raise ValueError(f"tag must be v{version} or a versioned nightly tag, got {tag!r}")
     tagged_commit = run("git", "rev-parse", "--verify", f"refs/tags/{tag}^{{commit}}")
     if tagged_commit != run("git", "rev-parse", "HEAD"):
         raise ValueError("release tag must point to the checked-out commit")
     if run("git", "status", "--porcelain"):
         raise ValueError("tagged releases require a clean checkout")
+
+def build_version(base, tag=None):
+    if tag:
+        validate_tag(tag, base)
+        return tag[1:], "nightly" if "-nightly." in tag else "stable"
+    commit = run("git", "rev-parse", "--short=12", "HEAD")
+    dirty = ".dirty" if run("git", "status", "--porcelain") else ""
+    return f"{base}-dev.{source_epoch()}.g{commit}{dirty}", "dev"
 
 
 def source_epoch():
@@ -113,7 +123,7 @@ def write_checksums(output, version, require_all=False):
     (output / "checksums.txt").write_text("".join(lines), encoding="utf-8", newline="\n")
 
 
-def build(output, version, expected_target=None):
+def build(output, version, expected_target=None, channel="dev"):
     env = os.environ.copy()
     env["GOCACHE"] = os.path.abspath("/tmp/linkport-gocache")
     target = tuple(run("go", "env", "GOHOSTOS", "GOHOSTARCH", env=env).splitlines())
@@ -132,7 +142,7 @@ def build(output, version, expected_target=None):
         commit += "-dirty"
     flags = (
         f"-s -w -buildid= -X {MODULE}.Version={version} "
-        f"-X {MODULE}.Commit={commit} -X {MODULE}.Date={date}"
+        f"-X {MODULE}.Commit={commit} -X {MODULE}.Date={date} -X {MODULE}.Channel={channel}"
     )
     binary_name = "linkport.exe" if system == "windows" else "linkport"
     with tempfile.TemporaryDirectory(prefix="linkport-release-") as temporary:
@@ -145,6 +155,7 @@ def build(output, version, expected_target=None):
         entries = [
             (binary_name, binary.read_bytes(), 0o755),
             ("VERSION", f"{version}\n".encode(), 0o644),
+            ("CHANNEL", f"{channel}\n".encode(), 0o644),
             ("CHANGELOG.md", (ROOT / "CHANGELOG.md").read_bytes(), 0o644),
             ("README.md", (ROOT / "README.md").read_bytes(), 0o644),
             ("licenses/Geist-OFL.txt", (ROOT / "docs/design/assets/fonts/OFL.txt").read_bytes(), 0o644),
@@ -220,6 +231,17 @@ def self_test():
             with mock.patch(f"{__name__}.run", side_effect=["same", "same", ""]):
                 validate_tag("v0.0.1", "0.0.1")
 
+        def test_channels_have_different_versions(self):
+            with mock.patch(f"{__name__}.validate_tag"):
+                self.assertEqual(build_version("0.0.2", "v0.0.2"), ("0.0.2", "stable"))
+                self.assertEqual(
+                    build_version("0.0.2", "v0.0.2-nightly.20261117180000.1"),
+                    ("0.0.2-nightly.20261117180000.1", "nightly"),
+                )
+            with mock.patch(f"{__name__}.run", side_effect=["012345abcdef", " M VERSION"]), \
+                 mock.patch(f"{__name__}.source_epoch", return_value=1794913200):
+                self.assertEqual(build_version("0.0.2"), ("0.0.2-dev.1794913200.g012345abcdef.dirty", "dev"))
+
         def test_wrong_native_platform_rejected(self):
             with mock.patch(f"{__name__}.run", return_value="darwin\narm64"):
                 with self.assertRaisesRegex(ValueError, "expected native darwin_amd64"):
@@ -248,18 +270,17 @@ def main():
     try:
         if args.require_all and not args.checksums_only:
             raise ValueError("--require-all requires --checksums-only")
-        version = read_version()
-        if args.tag:
-            validate_tag(args.tag, version)
+        base = read_version()
+        version, channel = build_version(base, args.tag)
         if args.validate_only:
-            print(f"validated version {version}" + (f", tag {args.tag}" if args.tag else ""))
+            print(f"validated version {version}, channel {channel}" + (f", tag {args.tag}" if args.tag else ""))
             return 0
         output = args.output.resolve()
         output.mkdir(parents=True, exist_ok=True)
         if args.checksums_only:
             write_checksums(output, version, args.require_all)
         else:
-            build(output, version, args.target)
+            build(output, version, args.target, channel)
     except (ValueError, OSError, subprocess.CalledProcessError) as error:
         parser.exit(1, f"release: {error}\n")
     return 0

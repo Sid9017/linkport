@@ -7,10 +7,10 @@ import hashlib
 import os
 from pathlib import Path
 import plistlib
-import re
 import shutil
 import subprocess
 import tempfile
+from urllib.parse import urlparse
 
 import release
 
@@ -70,9 +70,8 @@ def mac_bundle(directory, binary, version, env):
 
 
 def build(output, expected_target, go, tag):
-    version = release.read_version()
-    if tag:
-        release.validate_tag(tag, version)
+    base = release.read_version()
+    version, channel = release.build_version(base, tag)
     env = os.environ.copy()
     env.setdefault("GOTOOLCHAIN", "auto")
     env.setdefault("GOCACHE", str(Path(tempfile.gettempdir()) / "linkport-desktop-gocache"))
@@ -94,6 +93,7 @@ def build(output, expected_target, go, tag):
     flags = (
         f"-s -w -buildid= -X {release.MODULE}.Version={version} "
         f"-X {release.MODULE}.Commit={commit} "
+        f"-X {release.MODULE}.Channel={channel} "
         f"-X {release.MODULE}.Date={datetime.datetime.fromtimestamp(epoch, datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}"
     )
     public_key = env.get("LINKPORT_UPDATE_PUBLIC_KEY", "")
@@ -102,11 +102,12 @@ def build(output, expected_target, go, tag):
         if len(base64.b64decode(public_key, validate=True)) != 32:
             raise ValueError("LINKPORT_UPDATE_PUBLIC_KEY must contain a base64 Ed25519 public key")
         flags += f" -X main.updatePublicKey={public_key}"
-    repository = env.get("LINKPORT_UPDATE_REPOSITORY", "")
-    if repository:
-        if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
-            raise ValueError("LINKPORT_UPDATE_REPOSITORY must be owner/repo")
-        flags += f" -X main.updateRepository={repository}"
+    update_base = env.get("LINKPORT_UPDATE_BASE_URL", "")
+    if update_base:
+        parsed = urlparse(update_base)
+        if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path not in ("", "/") or any(c.isspace() for c in update_base):
+            raise ValueError("LINKPORT_UPDATE_BASE_URL must be a public HTTPS origin")
+        flags += f" -X main.updateBaseURL={update_base.rstrip('/')}"
     if system == "darwin":
         flags += " -extldflags=-mmacosx-version-min=14.5"
     elif system == "windows":
@@ -120,7 +121,7 @@ def build(output, expected_target, go, tag):
             "-trimpath", "-buildvcs=false", "-ldflags", flags, "-o", str(binary), ".",
         ], cwd=DESKTOP, env=env, check=True)
         if system == "darwin":
-            bundle = mac_bundle(staging, binary, version, env)
+            bundle = mac_bundle(staging, binary, base, env)
             destination = output / "Linkport.app"
             if destination.exists():
                 saved = plistlib.loads((destination / "Contents/Info.plist").read_bytes())
@@ -137,6 +138,7 @@ def build(output, expected_target, go, tag):
             entries = [(binary.name, binary.read_bytes(), 0o755)]
         entries.extend([
             ("VERSION", f"{version}\n".encode(), 0o644),
+            ("CHANNEL", f"{channel}\n".encode(), 0o644),
             ("README.md", (ROOT / "README.md").read_bytes(), 0o644),
             ("CHANGELOG.md", (ROOT / "CHANGELOG.md").read_bytes(), 0o644),
             ("licenses/Geist-OFL.txt", (ROOT / "docs/design/assets/fonts/OFL.txt").read_bytes(), 0o644),

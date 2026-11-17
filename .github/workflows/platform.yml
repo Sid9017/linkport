@@ -78,6 +78,12 @@ jobs:
           if [[ "$CGO_ENABLED" == "1" ]]; then test_args+=(-race); fi
           go test "${test_args[@]}" -json -count=1 -timeout=5m ./... | tee dist/ci/backend.json
           go vet ./...
+      - name: Validate version tooling and the public website
+        if: matrix.os == 'linux' && matrix.arch == 'amd64'
+        run: |
+          python scripts/release.py --self-test
+          node --test website/test/*.test.mjs
+          node website/build.mjs
       - name: Compile Windows driver integration suite
         if: inputs.platform == 'windows'
         run: go test -c -tags com0com_integration -o dist/ci/com0com.test.exe ./internal/vport

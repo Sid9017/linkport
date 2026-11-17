@@ -8,6 +8,8 @@ import (
 	"os"
 	"runtime"
 	"strings"
+
+	"github.com/Sid9017/linkport/internal/version"
 )
 
 //go:embed desktop-review.fragment.html
@@ -62,6 +64,7 @@ func newHandler(readSource func() (string, error), desktop bool, token string) h
 			http.Error(writer, "design source unavailable", http.StatusInternalServerError)
 			return
 		}
+		content = strings.ReplaceAll(content, "{{LINKPORT_VERSION}}", html.EscapeString(version.Version))
 		writer.Header().Set("Content-Type", "text/html; charset=utf-8")
 		writer.Header().Set("Cache-Control", "no-store")
 		writer.Header().Set("X-Content-Type-Options", "nosniff")
@@ -70,7 +73,7 @@ func newHandler(readSource func() (string, error), desktop bool, token string) h
 			policy = "default-src 'none'; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'"
 		}
 		writer.Header().Set("Content-Security-Policy", policy)
-		_, _ = fmt.Fprintf(writer, `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="linkport-host-platform" content="%s"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Linkport 0.0.1 · 桌面设计预览</title><style>:root{color-scheme:light dark}html,body{margin:0;padding:0;width:100%%;height:100%%;overflow:hidden;background:light-dark(#fff,#1b1b1b)}</style>`, runtime.GOOS)
+		_, _ = fmt.Fprintf(writer, `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="linkport-host-platform" content="%s"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Linkport %s</title><style>:root{color-scheme:light dark}html,body{margin:0;padding:0;width:100%%;height:100%%;overflow:hidden;background:light-dark(#fff,#1b1b1b)}</style>`, runtime.GOOS, html.EscapeString(version.Version))
 		if desktop {
 			_, _ = fmt.Fprintf(writer, `<meta name="linkport-desktop" content="true"><meta name="linkport-api-token" content="%s">`, html.EscapeString(token))
 			_, _ = writer.Write([]byte(`<script type="module" src="/wails/runtime.js"></script>`))

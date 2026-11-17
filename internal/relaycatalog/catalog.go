@@ -19,7 +19,10 @@ import (
 
 // These public values are set by the publisher build, not device configuration.
 var PublicKey = "f9O9q0EY9/eTxvYLHnyRUtsvw4kyVUaNGMXaVKRZNIc="
-var SourceURL = "https://207.148.110.58/relay-directory.json"
+
+// An empty source pins the relay set to the signed directory bundled with the
+// application. Remote checks, cached overrides and runtime updates stay off.
+var SourceURL = ""
 
 //go:embed bootstrap.json
 var Bootstrap []byte

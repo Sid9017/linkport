@@ -53,23 +53,25 @@ device private keys were not included in artifact transfers.
 
 ## Client update policy
 
-Production clients use the operator-signed relay directory; legacy custom relay
+Current clients pin the relay set to the bundled operator-signed directory;
+legacy custom relay
 and discovery configuration migrates to maintained defaults while preserving
 identity and pairings. User-facing relay URL, discovery URL and public-listener
 controls are removed. The reusable hosting module remains available to operator
 code and the standalone command.
 
-Desktop checks release and relay-directory updates after startup and every six
-hours. An available application or directory update shows an update badge.
-Automatic updates stage verified application packages and apply verified directory
-updates; restarting an application remains explicit. Disabling automatic updates
-keeps checking and manual apply actions available. Invalid signatures, expiry,
-rollback and version conflicts cannot replace the installed directory. Offline
-checks preserve installed configuration; direct-only mode stays disabled.
+Desktop checks application releases after startup and every six hours. Available
+application updates show an update badge. Automatic updates stage verified
+application packages; restarting remains explicit. Current builds have no remote
+directory source, ignore legacy directory caches and reject runtime directory
+replacement. Settings show “Updated with the app”; node changes require a new
+application build. Direct-only mode stays disabled.
 
-The directory expires February 14, 2027. The operator must publish a higher signed
-version before then. The directory signing key stays offline; it was not uploaded
-to the VPS. Use `tools/relay-catalog` to sign and atomically replace the served JSON.
+The bundled directory's freshness date is February 14, 2027. Its signature is
+still checked after that date, so an installed application retains its fixed
+relay. Future remote-update builds must reject expired incoming updates. The
+directory signing key stays offline; it was not uploaded to the VPS. Use
+`tools/relay-catalog` to sign an updated bootstrap before rebuilding desktop.
 Application release signing uses a separate key. The operator authorized configuring the application release key and matching
 public key in `Sid9017/linkport` GitHub Actions encrypted repository secrets. Both
 `LINKPORT_UPDATE_PRIVATE_KEY` and `LINKPORT_UPDATE_PUBLIC_KEY` were configured and
@@ -94,4 +96,74 @@ published release and was not installed over the user's existing desktop app.
 ```text
 linkport-desktop_0.0.1_darwin_arm64.zip
 SHA256 258945fc6605823331bb96550e51481e471018d70d165bfd52cadd69c9121e00
+```
+
+## Pairing follow-up — November 17, 2026
+
+Invitations now expire after eight hours and remain single-use. Replacing an
+invitation or exiting its process still invalidates it. Receivers tolerate
+copy-induced whitespace and invisible separators without changing decoded
+credentials, and distinguish missing prefixes, malformed encoding/content,
+expiry, clock errors and connection failures. Both machines should use the new
+build for eight-hour invitations: old receivers impose the previous lifetime.
+
+The pinned endpoint omits interface addresses when its UDP socket is bound to
+an unspecified address. Invitations and authenticated contact records now also
+include bounded LAN candidates from active non-loopback, non-point-to-point
+interfaces. This gives iroh a direct LAN path when STUN or the public relay is
+unavailable. Public pkarr publication continues to use the separate relay-only
+publisher. The desktop reports the observed relay connection and last error,
+rather than treating an initialized endpoint as a connected relay.
+
+The root race suite and `go vet ./...`, separate desktop production race tests,
+and isolated Chromium fixtures passed after these changes. Explicit regressions
+also passed for wildcard-bound endpoints pairing over real local UDP without a
+relay, eight-hour expiry, and formatted invitations preserving single-use
+authorization. These checks do not establish pairing between two physical
+machines or public-network reachability.
+
+The user subsequently reported successful invitation-based pairing between two
+physical machines using the repair build. This is user-reported pairing
+acceptance; the selected direct/relay path, serial byte transfer and hardware
+behavior were not independently observed.
+
+The supplied complete invitation passed the original application parser before
+its expiry. A subsequent native UI inspection read `inkport1.` in the submitted
+field, confirming a missing leading `l` in that field while the chat-supplied
+original had the complete prefix. This does not establish which copying or
+editing step lost the character. The rebuilt native app was checked to report
+the missing prefix explicitly and display the eight-hour lifetime.
+
+The development Mac still received connection resets after approximately five
+seconds on Tokyo HTTPS, HTTP and SSH. Trusted HTTPS with TLS 1.2 had the same
+outcome. Fresh Check-Host HTTPS health probes from Baku, Sofia and Shiraz each
+returned HTTP 200 (request `587ee0d1kfa2`). Other HTTPS destinations were
+reachable from the Mac. The rebuilt native app also exposed the actual relay
+WebSocket handshake reset. No authenticated server-side
+inspection was possible: SSH reset before authentication and the provider
+console remained behind a browser security verification page. The origin of
+the resets is unresolved; a successful Mac-to-Tokyo acceptance test is still
+required. No relay deployment or system network configuration was changed
+during this follow-up.
+
+## Bundled relay policy — November 17, 2026
+
+At the user's request, GitHub directory distribution and mesh-wide publication
+are deferred. The default build uses only the embedded Tokyo relay and verifies
+its existing operator signature. No directory request goes to Tokyo or GitHub;
+legacy directory caches cannot override the bundled list. Existing identity,
+pairings, eight-hour invitations and the direct-only option are retained.
+Application release polling continues independently. This policy change does
+not establish that the Mac-to-Tokyo connection resets have been resolved.
+
+The root race suite, root `go vet`, separate desktop production race suite,
+and isolated Chromium fixtures passed with the bundled policy. The macOS arm64
+test build is in `dist/desktop-fixed-relay`; its ad-hoc bundle signature
+verified successfully. The native app was opened and Settings displayed
+“随应用更新 · v1” without a relay-update button. Existing paired-device
+inventory remained visible; no hardware serial session was opened for this check.
+
+```text
+linkport-desktop_0.0.1_darwin_arm64.zip
+SHA256 1a8823a9586e74a405623a8d40a20c51e7d9d6f6db8147b1dbca2a3b125f8e42
 ```

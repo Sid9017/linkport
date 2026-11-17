@@ -2,10 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/ed25519"
 	"encoding/base64"
 	"errors"
-	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -15,16 +14,18 @@ import (
 	"github.com/Sid9017/linkport/internal/version"
 	"github.com/wailsapp/wails/v3/pkg/application"
 	"github.com/wailsapp/wails/v3/pkg/updater"
-	"github.com/wailsapp/wails/v3/pkg/updater/providers/github"
+	"github.com/wailsapp/wails/v3/pkg/updater/providers/endpoint"
 )
 
 var updatePublicKey = "hRHv6nvu8IA0lGNwJUnXCCgQG+QUeVpI+PVcs3+aHW4="
-var updateRepository = "Sid9017/linkport"
+var updateBaseURL = "https://linkport.grezl.link"
 
 type updateStatus struct {
 	Configured bool    `json:"configured"`
 	State      string  `json:"state"`
 	Version    string  `json:"version"`
+	Channel    string  `json:"channel"`
+	Commit     string  `json:"commit"`
 	Next       string  `json:"next,omitempty"`
 	Progress   float64 `json:"progress"`
 	Error      string  `json:"error,omitempty"`
@@ -42,7 +43,14 @@ type updateController struct {
 func newUpdateController(ctx context.Context, app *application.App, settings *preferenceStore) (*updateController, error) {
 	controller := &updateController{
 		ctx: ctx, updater: app.Updater, settings: settings,
-		status: updateStatus{State: "unconfigured", Version: version.Version},
+		status: updateStatus{State: "unconfigured", Version: version.Version, Channel: version.Channel, Commit: version.Commit},
+	}
+	if version.Channel == "dev" {
+		controller.status.State = "development"
+		return controller, nil
+	}
+	if version.Channel != "stable" && version.Channel != "nightly" {
+		return nil, errors.New("unsupported release channel")
 	}
 	if updatePublicKey == "" {
 		return controller, nil
@@ -51,27 +59,13 @@ func newUpdateController(ctx context.Context, app *application.App, settings *pr
 	if err != nil || len(key) != 32 {
 		return nil, errors.New("invalid embedded update public key")
 	}
-	provider, err := github.New(github.Config{
-		Repository: updateRepository, Prerelease: true,
-		ChecksumAsset: "desktop-checksums.txt",
-		HTTPClient:    &http.Client{},
-		AssetMatcher: func(request updater.CheckRequest, assets []github.ReleaseAsset) int {
-			suffix := "_" + request.Platform + "_" + request.Arch + ".zip"
-			for index, asset := range assets {
-				if strings.HasPrefix(asset.Name, "linkport-desktop_") && strings.HasSuffix(asset.Name, suffix) {
-					return index
-				}
-			}
-			return -1
-		},
-	})
+	provider, err := newSignedProvider(updateBaseURL, version.Channel, key, &http.Client{Timeout: 30 * time.Second})
 	if err != nil {
 		return nil, err
 	}
-	signed := &signedProvider{Provider: provider, client: &http.Client{}}
 	if err := app.Updater.Init(updater.Config{
 		CurrentVersion: version.Version,
-		Providers:      []updater.Provider{signed},
+		Providers:      []updater.Provider{provider},
 		PublicKey:      key,
 		Window:         updater.WindowNone,
 	}); err != nil {
@@ -96,6 +90,9 @@ func newUpdateController(ctx context.Context, app *application.App, settings *pr
 }
 
 func (controller *updateController) snapshot() updateStatus {
+	if controller == nil {
+		return updateStatus{State: "unconfigured"}
+	}
 	controller.mu.Lock()
 	status := controller.status
 	controller.mu.Unlock()
@@ -134,11 +131,12 @@ func (controller *updateController) runJob(downloadOnly bool) error {
 			var release *updater.Release
 			release, err = controller.updater.Check(ctx)
 			cancel()
+			controller.mu.Lock()
+			controller.status.Next = ""
 			if err == nil && release != nil {
-				controller.mu.Lock()
 				controller.status.Next = release.Version
-				controller.mu.Unlock()
 			}
+			controller.mu.Unlock()
 			if err != nil || release == nil || !controller.settings.get().AutoUpdate {
 				controller.recordError(err)
 				return
@@ -190,7 +188,27 @@ func (controller *updateController) restart() error {
 
 type signedProvider struct {
 	updater.Provider
-	client *http.Client
+	key     ed25519.PublicKey
+	baseURL *url.URL
+	channel string
+}
+
+func newSignedProvider(source, channel string, key ed25519.PublicKey, client *http.Client) (*signedProvider, error) {
+	if channel != "stable" && channel != "nightly" {
+		return nil, errors.New("unsupported update channel")
+	}
+	base, err := url.Parse(source)
+	if err != nil || base.Host == "" || base.User != nil || base.RawQuery != "" || base.Fragment != "" {
+		return nil, errors.New("invalid update source")
+	}
+	p, err := endpoint.New(endpoint.Config{
+		URL:     strings.TrimRight(source, "/") + "/updates/" + channel + ".json",
+		Channel: channel, HTTPClient: client,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &signedProvider{Provider: p, key: key, baseURL: base, channel: channel}, nil
 }
 
 func (provider *signedProvider) Check(ctx context.Context, request updater.CheckRequest) (*updater.Release, error) {
@@ -198,35 +216,23 @@ func (provider *signedProvider) Check(ctx context.Context, request updater.Check
 	if err != nil || release == nil {
 		return release, err
 	}
-	if release.Verification == nil || len(release.Verification.Digest) != 32 {
-		return nil, errors.New("release is missing its SHA-256 checksum")
+	if release.Channel != provider.channel ||
+		(provider.channel == "stable" && strings.Contains(release.Version, "-")) ||
+		(provider.channel == "nightly" && !strings.Contains(release.Version, "-nightly.")) {
+		return nil, errors.New("release channel rejected")
 	}
-	tag, _ := release.Metadata["github.release.tag"].(string)
-	if tag == "" {
-		return nil, errors.New("release tag is missing")
+	v := release.Verification
+	if v == nil || v.DigestAlgo != "sha256" || len(v.Digest) != 32 ||
+		v.SignatureAlgo != "ed25519" || len(provider.key) != ed25519.PublicKeySize ||
+		!ed25519.Verify(provider.key, v.Digest, v.Signature) {
+		return nil, errors.New("release checksum or publisher signature rejected")
 	}
-	address := "https://github.com/" + updateRepository + "/releases/download/" + url.PathEscape(tag) + "/" + url.PathEscape(release.Artifact.Filename+".sig")
-	query, err := http.NewRequestWithContext(ctx, http.MethodGet, address, nil)
-	if err != nil {
-		return nil, err
+	address, _ := release.Metadata["endpoint.artifact.url"].(string)
+	target, err := url.Parse(address)
+	if err != nil || target.Scheme != provider.baseURL.Scheme || target.Host != provider.baseURL.Host ||
+		target.User != nil || target.RawQuery != "" || target.Fragment != "" || !strings.HasPrefix(target.Path, "/downloads/") ||
+		release.Artifact.Filename != "linkport-desktop_"+release.Version+"_"+request.Platform+"_"+request.Arch+".zip" || release.Artifact.Filetype != "zip" {
+		return nil, errors.New("release artifact is outside the public download service")
 	}
-	response, err := provider.client.Do(query)
-	if err != nil {
-		return nil, err
-	}
-	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("release signature unavailable: HTTP %d", response.StatusCode)
-	}
-	body, err := io.ReadAll(io.LimitReader(response.Body, 4096))
-	if err != nil {
-		return nil, err
-	}
-	signature, err := base64.StdEncoding.DecodeString(strings.TrimSpace(string(body)))
-	if err != nil || len(signature) != 64 {
-		return nil, errors.New("invalid release signature")
-	}
-	release.Verification.SignatureAlgo = "ed25519"
-	release.Verification.Signature = signature
 	return release, nil
 }

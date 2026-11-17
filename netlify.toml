@@ -1,0 +1,33 @@
+[build]
+  command = "npm --prefix website run build"
+  publish = "website/dist"
+
+[build.environment]
+  NODE_VERSION = "24"
+
+[functions]
+  directory = "website/netlify/functions"
+  node_bundler = "esbuild"
+
+[[redirects]]
+  from = "/api/releases"
+  to = "/.netlify/functions/releases"
+  status = 200
+
+[[redirects]]
+  from = "/updates/:channel.json"
+  to = "/.netlify/functions/releases?channel=:channel"
+  status = 200
+
+[[redirects]]
+  from = "/downloads/:tag/:filename"
+  to = "/.netlify/functions/releases?tag=:tag&filename=:filename"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Frame-Options = "DENY"
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"

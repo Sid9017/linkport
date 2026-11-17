@@ -1,0 +1,52 @@
+name: Nightly
+
+on:
+  schedule:
+    - cron: "0 18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+      changed: ${{ steps.version.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Create an immutable nightly tag when main changed
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          commit=$(git rev-parse HEAD)
+          previous=$(gh api "repos/$GH_REPO/releases?per_page=100" \
+            --jq '[.[] | select(.draft == false and .prerelease == true and (.tag_name | contains("-nightly.")))][0].target_commitish // ""')
+          if [[ "$previous" == "$commit" ]]; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          base=$(cat VERSION)
+          tag="v${base}-nightly.$(date -u +%Y%m%d%H%M%S).${GITHUB_RUN_NUMBER}"
+          gh api "repos/$GH_REPO/git/refs" --method POST -f "ref=refs/tags/$tag" -f "sha=$commit"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+  release:
+    needs: prepare
+    if: needs.prepare.outputs.changed == 'true'
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.prepare.outputs.tag }}
+    secrets:
+      LINKPORT_UPDATE_PUBLIC_KEY: ${{ secrets.LINKPORT_UPDATE_PUBLIC_KEY }}
+      LINKPORT_UPDATE_PRIVATE_KEY: ${{ secrets.LINKPORT_UPDATE_PRIVATE_KEY }}

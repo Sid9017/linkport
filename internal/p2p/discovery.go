@@ -87,7 +87,7 @@ func (n *Network) ownRecord() (AddressRecord, error) {
 	if n.stopped || n.endpoint == nil {
 		return AddressRecord{}, errors.New("network is stopped")
 	}
-	ticket := endpointticket.Encode(n.endpoint.Addr())
+	ticket := endpointticket.Encode(n.contactAddress())
 	s := n.store
 	s.mu.Lock()
 	defer s.mu.Unlock()
