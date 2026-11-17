@@ -16,15 +16,23 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
+
+	"github.com/Sid9017/linkport/internal/relaycatalog"
+	"github.com/Sid9017/linkport/internal/relayservice"
 
 	"github.com/tmc/go-iroh/endpointticket"
 	"github.com/tmc/go-iroh/iroh"
 	"github.com/tmc/go-iroh/iroh/mdns"
 	"github.com/tmc/go-iroh/key"
 	"github.com/tmc/go-iroh/netaddr"
+	"github.com/tmc/go-iroh/relay"
 )
 
-const ALPN = "linkport/1"
+const (
+	ALPN               = "linkport/1"
+	invitationLifetime = 8 * time.Hour
+)
 
 type Options struct {
 	Directory string
@@ -35,15 +43,19 @@ type Options struct {
 }
 
 type Status struct {
-	State           string        `json:"state"`
-	NodeID          string        `json:"nodeID"`
-	HostName        string        `json:"hostName"`
-	Ticket          string        `json:"ticket"`
-	HomeRelay       string        `json:"homeRelay,omitempty"`
-	RelayConnected  bool          `json:"relayConnected"`
-	Config          NetworkConfig `json:"config"`
-	RestartRequired bool          `json:"restartRequired"`
-	Error           string        `json:"error,omitempty"`
+	State                 string                  `json:"state"`
+	NodeID                string                  `json:"nodeID"`
+	HostName              string                  `json:"hostName"`
+	Ticket                string                  `json:"ticket"`
+	HomeRelay             string                  `json:"homeRelay,omitempty"`
+	RelayConnected        bool                    `json:"relayConnected"`
+	RelayError            string                  `json:"relayError,omitempty"`
+	Config                NetworkConfig           `json:"config"`
+	RestartRequired       bool                    `json:"restartRequired"`
+	Error                 string                  `json:"error,omitempty"`
+	RelayDirectoryVersion uint64                  `json:"relayDirectoryVersion"`
+	PublicRelays          []string                `json:"publicRelays"`
+	HostedRelay           relayservice.HostStatus `json:"hostedRelay"`
 }
 
 type Invitation struct {
@@ -70,21 +82,29 @@ type pairingState struct {
 type peerContextKey struct{}
 
 type Network struct {
-	ctx       context.Context
-	store     *Store
-	endpoint  *iroh.Endpoint
-	listener  *iroh.StreamListener
-	publisher *iroh.PkarrPublisher
-	cancel    context.CancelFunc
-	mu        sync.Mutex
-	dialLocks [32]sync.Mutex
-	server    *http.Server
-	conns     map[string]map[*iroh.Conn]struct{}
-	invites   map[[32]byte]time.Time
-	pairing   map[string]*pairingState
-	restart   bool
-	stopped   bool
-	closeOnce sync.Once
+	ctx          context.Context
+	store        *Store
+	endpoint     *iroh.Endpoint
+	listener     *iroh.StreamListener
+	publisher    *iroh.PkarrPublisher
+	cancel       context.CancelFunc
+	mu           sync.Mutex
+	dialLocks    [32]sync.Mutex
+	server       *http.Server
+	conns        map[string]map[*iroh.Conn]struct{}
+	invites      map[[32]byte]time.Time
+	pairing      map[string]*pairingState
+	restart      bool
+	stopped      bool
+	closeOnce    sync.Once
+	workers      sync.WaitGroup
+	syncWake     chan struct{}
+	hostMu       sync.Mutex
+	failedRelays map[string]time.Time
+	hosted       *relayservice.Host
+	catalog      relaycatalog.Verified
+	catalogPath  string
+	localOnly    bool
 }
 
 func New(ctx context.Context, opts Options) (_ *Network, err error) {
@@ -94,14 +114,31 @@ func New(ctx context.Context, opts Options) (_ *Network, err error) {
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	n := &Network{
-		ctx: ctx, store: store, cancel: cancel, conns: make(map[string]map[*iroh.Conn]struct{}),
-		invites: make(map[[32]byte]time.Time), pairing: make(map[string]*pairingState),
+		ctx: ctx, store: store, cancel: cancel, localOnly: opts.LocalOnly, conns: make(map[string]map[*iroh.Conn]struct{}),
+		invites: make(map[[32]byte]time.Time), pairing: make(map[string]*pairingState), syncWake: make(chan struct{}, 1),
 	}
 	defer func() {
 		if err != nil {
 			n.Close()
 		}
 	}()
+	if !opts.LocalOnly {
+		if err = n.loadManagedCatalog(opts.Directory); err != nil {
+			return nil, err
+		}
+		cfg := store.Config()
+		if cfg.RelayMode == "custom" || cfg.DiscoveryURL != "" || cfg.HostedRelay.Enabled {
+			if cfg.RelayMode == "custom" {
+				cfg.RelayMode = "default"
+			}
+			cfg.RelayURLs = []string{}
+			cfg.DiscoveryURL = ""
+			cfg.HostedRelay = relayservice.HostConfig{}
+			if err = store.SaveConfig(cfg); err != nil {
+				return nil, err
+			}
+		}
+	}
 	if opts.Disabled {
 		return n, nil
 	}
@@ -118,7 +155,11 @@ func New(ctx context.Context, opts Options) (_ *Network, err error) {
 	if opts.LocalOnly {
 		options = append(options, iroh.WithBindAddr(netip.AddrPortFrom(netip.MustParseAddr("127.0.0.1"), 0)))
 	} else {
-		options = append(options, iroh.WithRelayMode(relayMode(cfg)))
+		if cfg.RelayMode == "disabled" {
+			options = append(options, iroh.WithRelayMode(relay.ModeDisabled()))
+		} else {
+			options = append(options, iroh.WithRelayMode(managedRelayMode(n.catalog.URLs())))
+		}
 		lan := mdns.New(secret.Public().EndpointID())
 		lookup.AddResolver(lan)
 		lookup.AddPublisher(lan)
@@ -153,6 +194,12 @@ func New(ctx context.Context, opts Options) (_ *Network, err error) {
 	if err != nil {
 		return nil, err
 	}
+	if cfg.HostedRelay.Enabled {
+		n.hosted, err = relayservice.StartHost(ctx, cfg.HostedRelay)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return n, nil
 }
 
@@ -161,14 +208,17 @@ func (n *Network) Status() Status {
 	defer n.mu.Unlock()
 	state := Status{
 		State: "Disabled", NodeID: n.store.secret().Public().String(), HostName: n.store.Name(),
-		Config: n.store.Config(), RestartRequired: n.restart,
+		Config: n.store.Config(), RestartRequired: n.restart, RelayDirectoryVersion: n.catalog.Version(), PublicRelays: n.catalog.URLs(), HostedRelay: n.hosted.Status(),
 	}
 	if n.endpoint != nil && !n.stopped {
 		state.State = "Running"
-		state.Ticket = endpointticket.Encode(n.endpoint.Addr())
+		state.Ticket = endpointticket.Encode(n.contactAddress())
 		if home := n.endpoint.HomeRelayStatus().Current(); home != nil {
 			state.HomeRelay = home.URL.String()
 			state.RelayConnected = home.IsConnected()
+			if !state.RelayConnected && home.LastError != nil {
+				state.RelayError = home.LastError.Error()
+			}
 		}
 	}
 	if n.restart {
@@ -211,6 +261,10 @@ func (n *Network) Authorize(next http.Handler) http.Handler {
 			http.Error(w, "device is not paired", http.StatusForbidden)
 			return
 		}
+		if r.URL.Path == "/v1/discovery" {
+			n.serveDiscovery(w, r, id)
+			return
+		}
 		next.ServeHTTP(w, r)
 	})
 }
@@ -225,12 +279,15 @@ func (n *Network) Serve(handler http.Handler) {
 		IdleTimeout: 30 * time.Second, MaxHeaderBytes: 16 * 1024,
 	}
 	n.mu.Lock()
-	if n.stopped {
+	if n.stopped || n.server != nil {
 		n.mu.Unlock()
 		return
 	}
 	n.server = server
+	n.workers.Add(2)
 	n.mu.Unlock()
+	go func() { defer n.workers.Done(); n.discoveryLoop() }()
+	go func() { defer n.workers.Done(); n.relayRecoveryLoop() }()
 	_ = server.Serve(n.Listener())
 }
 
@@ -260,13 +317,28 @@ func (n *Network) Dial(ctx context.Context, id string) (net.Conn, error) {
 			if err != nil {
 				return nil, err
 			}
-			return n.dial(ctx, addr)
+			addr = n.cachedAddress(id, addr)
+			conn, err := n.dialWithLookup(ctx, addr, false)
+			if err == nil || ctx.Err() != nil {
+				return conn, err
+			}
+			if n.discoverViaPeers(ctx, id) {
+				conn, err = n.dialWithLookup(ctx, n.cachedAddress(id, addr), false)
+				if err == nil || ctx.Err() != nil {
+					return conn, err
+				}
+			}
+			return n.dial(ctx, n.cachedAddress(id, addr))
 		}
 	}
 	return nil, errors.New("设备未配对或已移除")
 }
 
 func (n *Network) dial(ctx context.Context, addr netaddr.EndpointAddr) (net.Conn, error) {
+	return n.dialWithLookup(ctx, addr, true)
+}
+
+func (n *Network) dialWithLookup(ctx context.Context, addr netaddr.EndpointAddr, resolve bool) (net.Conn, error) {
 	digest := sha256.Sum256([]byte(addr.ID.String()))
 	lock := &n.dialLocks[int(digest[0])%len(n.dialLocks)]
 	lock.Lock()
@@ -281,6 +353,7 @@ func (n *Network) dial(ctx context.Context, addr netaddr.EndpointAddr) (net.Conn
 	if !allowed {
 		return nil, errors.New("设备未配对或已移除")
 	}
+	addr = n.withRelayCandidates(addr)
 	var conn *iroh.Conn
 	var stream net.Conn
 	var err error
@@ -297,7 +370,7 @@ func (n *Network) dial(ctx context.Context, addr netaddr.EndpointAddr) (net.Conn
 			cachedCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 			conn, err = n.endpoint.Connect(cachedCtx, addr, ALPN)
 			cancel()
-			if err != nil && ctx.Err() == nil {
+			if err != nil && ctx.Err() == nil && resolve {
 				// A saved ticket can become stale after changing networks.
 				conn, err = n.endpoint.Connect(ctx, netaddr.NewEndpointAddr(addr.ID), ALPN)
 			}
@@ -459,7 +532,7 @@ func (n *Network) AfterHandshake(_ context.Context, conn *iroh.Conn) error {
 func (n *Network) self() Peer {
 	return Peer{
 		ID: n.endpoint.ID().String(), HostName: n.store.Name(),
-		Ticket: endpointticket.Encode(n.endpoint.Addr()),
+		Ticket: endpointticket.Encode(n.contactAddress()),
 	}
 }
 
@@ -474,7 +547,7 @@ func (n *Network) CreateInvitation() (Invitation, error) {
 		return Invitation{}, err
 	}
 	token := base64.RawURLEncoding.EncodeToString(random[:])
-	expires := time.Now().UTC().Add(5 * time.Minute)
+	expires := time.Now().UTC().Add(invitationLifetime)
 	payload := invitePayload{Version: 1, Peer: n.self(), Token: token, Expires: expires}
 	data, err := json.Marshal(payload)
 	if err != nil {
@@ -490,23 +563,36 @@ func parseInvitation(code string) (invitePayload, error) {
 	if len(code) > 24*1024 {
 		return payload, errors.New("配对邀请过长")
 	}
-	raw, ok := strings.CutPrefix(strings.TrimSpace(code), "linkport1.")
+	// Messaging apps can insert wrapping whitespace or invisible separators.
+	// Remove only formatting: never guess missing characters or change the
+	// encoded bytes, token, identity, or authorization checks.
+	code = strings.Map(func(r rune) rune {
+		if unicode.IsSpace(r) || r == '\u200b' || r == '\u2060' || r == '\ufeff' {
+			return -1
+		}
+		return r
+	}, code)
+	raw, ok := strings.CutPrefix(code, "linkport1.")
 	if !ok {
-		return payload, errors.New("无效的 Linkport 配对邀请")
+		return payload, errors.New("配对邀请应以 linkport1. 开头，请完整复制另一台设备的邀请")
 	}
 	data, err := base64.RawURLEncoding.DecodeString(raw)
 	if err != nil {
-		return payload, errors.New("无效的 Linkport 配对邀请")
+		return payload, errors.New("配对邀请编码不完整或含有多余字符，请使用复制邀请按钮后重新粘贴")
 	}
 	if err := decodeOne(bytes.NewReader(data), &payload); err != nil {
-		return payload, errors.New("无效的 Linkport 配对邀请")
+		return payload, errors.New("配对邀请内容不完整或格式错误，请完整复制后重试")
 	}
 	token, err := base64.RawURLEncoding.DecodeString(payload.Token)
 	if err != nil || len(token) != 32 || payload.Version != 1 {
 		return payload, errors.New("无效的配对密钥或版本")
 	}
-	if !time.Now().Before(payload.Expires) || time.Until(payload.Expires) > 6*time.Minute {
+	now := time.Now()
+	if !now.Before(payload.Expires) {
 		return payload, errors.New("配对邀请已过期，请在另一台机器重新生成")
+	}
+	if payload.Expires.After(now.Add(invitationLifetime + time.Minute)) {
+		return payload, errors.New("配对邀请有效期异常，请检查两台机器的系统时间后重新生成")
 	}
 	if _, err := validatePeer(payload.Peer); err != nil {
 		return payload, err
@@ -555,6 +641,15 @@ func (n *Network) AddDevice(ctx context.Context, code string) (Peer, error) {
 	}
 	response, err := client.Do(request)
 	if err != nil {
+		if len(addr.IPAddrs()) == 0 {
+			state := n.Status()
+			if state.Config.RelayMode == "disabled" {
+				return Peer{}, errors.New("邀请仅包含中继地址，当前为仅直连模式；请切换公共中继并重启后重试")
+			}
+			if !state.RelayConnected {
+				return Peer{}, errors.New("邀请格式正确，但尚未连接公共中继；请检查网络设置中的中继连接状态后重试")
+			}
+		}
 		return Peer{}, fmt.Errorf("无法联系邀请设备：%w", err)
 	}
 	defer response.Body.Close()
@@ -580,6 +675,7 @@ func (n *Network) rememberPairing(peer Peer, pairing *pairingState) (Peer, error
 	if err := n.store.remember(peer); err != nil {
 		return Peer{}, err
 	}
+	n.wakeDiscovery()
 	return peer, nil
 }
 
@@ -610,6 +706,7 @@ func (n *Network) acceptPair(w http.ResponseWriter, r *http.Request, remoteID st
 		return
 	}
 	delete(n.invites, digest)
+	n.wakeDiscovery()
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(n.self())
 }
@@ -646,6 +743,9 @@ func (n *Network) RemoveDevice(id string) error {
 }
 
 func (n *Network) SaveConfig(cfg NetworkConfig) error {
+	if !n.localOnly && (cfg.RelayMode == "custom" || len(cfg.RelayURLs) > 0 || cfg.DiscoveryURL != "" || cfg.HostedRelay.Enabled) {
+		return errors.New("public relays are maintained by the Linkport operator")
+	}
 	n.mu.Lock()
 	if err := n.store.SaveConfig(cfg); err != nil {
 		n.mu.Unlock()
@@ -681,8 +781,12 @@ func (n *Network) stopTransport() {
 	}
 	n.stopped = true
 	server := n.server
+	hosted := n.hosted
 	n.mu.Unlock()
 	n.cancel()
+	if hosted != nil {
+		_ = hosted.Close()
+	}
 	if server != nil {
 		_ = server.Close()
 	}
@@ -702,6 +806,7 @@ func (n *Network) stopTransport() {
 func (n *Network) Close() {
 	n.closeOnce.Do(func() {
 		n.stopTransport()
+		n.workers.Wait()
 		_ = n.store.Close()
 	})
 }

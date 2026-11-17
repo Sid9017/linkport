@@ -10,6 +10,8 @@
 | 了解端、连接基础设施、官网和发布服务的整体关系 | [端与云服务架构](system-architecture.md) |
 | 查看启动、配对、发现、串口会话及撤销的完整交互 | [交互时序](interaction-sequences.md) |
 | 准备官网定位、页面结构、文案和展示素材 | [官网内容与展示方案](website-brief.md) |
+| 运行独立/内嵌中继、协同发现与资源限制 | [自建中继](relay.md) |
+| 维护、签名和更新内置中继节点列表 | [目录维护](relay-directory.md) |
 | 安装运行、添加设备、配置中继、管理密钥 | [iroh 设备身份与连接](iroh.md) |
 | 理解串口共享、热插拔、会话与代码模块 | [串口与运行时架构](architecture.md) |
 | 了解桌面配置、原生菜单、日志与自动更新 | [桌面说明](desktop.md) |
@@ -31,4 +33,6 @@
 - Mermaid 代码块是图的可编辑源文件，可在支持 Mermaid 的仓库阅读器中查看，后续也可以导出 SVG 用于官网。
 - 源码与说明冲突时，应先核对源码和测试，再同步修改文档与官网表述。
 
-目前没有部署项目自有中继、地址发现或官网。默认客户端可使用公共 iroh 服务；本机临时中继只用于自动化测试。
+目前没有部署项目自有中继、地址发现或官网。默认客户端可使用公共 iroh 服务；独立中继已提供源码入口与部署示例，见 [自建中继](relay.md)；自动化测试使用隔离的本机端点。
+
+- [Tokyo public relay deployment and acceptance](relay-deployment.md) — live configuration, certificate renewal, client policy, and verified limits.

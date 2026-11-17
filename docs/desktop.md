@@ -1,4 +1,4 @@
-# Linkport desktop 0.0.1
+# Linkport desktop
 
 The desktop host uses Wails v3.1.0 with Go 1.26.11. It lives in a separate
 module under `desktop/`, reusing the root module through a local replacement.
@@ -49,7 +49,7 @@ persistent identity in `linkport/devices.json`; the same file contains trusted
 public keys and relay configuration. Unix permissions are 0600; Windows uses
 the user configuration directory ACL. Never share this file with another device.
 
-Create a single-use five-minute invitation on one machine and paste it on the
+Create a single-use eight-hour invitation on one machine and paste it on the
 other. Both machines must be running. The encrypted handshake pins the public
 keys; the invitation authorizes mutual trust, not automatic sharing of ports.
 Removing a device disconnects its streams and denies subsequent requests.
@@ -94,17 +94,30 @@ and incoming remote sessions from opening the same device concurrently.
 
 ## Background updates
 
-Updates use the Wails updater with a signed GitHub provider. Linkport checks
-after 30 seconds and then every six hours when the preference is enabled.
-New desktop archives are downloaded, checked against SHA-256 and Ed25519
-signatures, and staged. The user chooses restart; Wails' helper performs
-replacement and recovery. The application does not overwrite its running
-binary directly or restart in the middle of a debugging session.
+Updates use the Wails updater with a public endpoint provider at
+`https://linkport.grezl.link/updates/stable.json` or
+`https://linkport.grezl.link/updates/nightly.json`, selected by the build's channel.
+Stable and Nightly never cross channels. Dev builds show their development
+version/commit, disable update checks and cannot replace themselves. The UI
+version comes from build metadata rather than a hardcoded label.
 
-0.0.x builds allow published pre-releases and ignore drafts. The provider
-matches `linkport-desktop_VERSION_GOOS_GOARCH.zip`, never CLI archives.
-It expects `desktop-checksums.txt` and a base64 `ARCHIVE.zip.sig` sidecar.
-The signature covers the raw SHA-256 digest, matching Wails' Ed25519 verifier.
+Stable/Nightly checks start thirty seconds after launch and repeat every six
+hours, including when automatic downloads are disabled. Manual checks are
+immediate. The UI reads cached native state every fifteen seconds and every
+three seconds while Settings is open; those reads do not query the remote feed.
+There is no inbound update listener or push subscription.
+
+The public service exposes only published packages and release metadata from
+the private repository. No GitHub credential is embedded in desktop. Before
+showing an available update, desktop checks its channel, semantic version,
+platform/archive name, SHA-256 digest and Ed25519 publisher signature. The
+Wails installer verifies the downloaded bytes again, stages them and waits
+for an explicit restart. Outages remain errors; they do not claim to be
+successful up-to-date checks. Repeated checks clear obsolete pending versions.
+
+The relay set remains fixed to the signed bundled Tokyo node
+`https://207.148.110.58`. No remote relay directory is configured, and legacy
+relay caches cannot override it. Settings show “Updated with the app”.
 
 No signing key is generated or installed by building the app. Without an
 embedded public key, automatic installation is disabled and Settings reports
@@ -128,8 +141,8 @@ archive and rejects a mismatched key pair. Both values are required together;
 the private key is not passed to platform build jobs or embedded in the app.
 A macOS production release should also use Developer ID signing and notarization.
 
-The default feed is `Sid9017/linkport`. `LINKPORT_UPDATE_REPOSITORY=owner/repo`
-can select a public releases repository at build time, useful when the source
-repository is private. The CI builds default to the source repository; changing
-the release destination also requires updating the release publishing workflow.
-No GitHub token is shipped in the app.
+The public feed base defaults to `https://linkport.grezl.link`.
+`LINKPORT_UPDATE_BASE_URL` can override it for a publisher-controlled HTTPS
+mirror at build time. It is not a desktop-user setting. See
+[versioning and release operations](releasing.md) for package identities,
+publication, the Netlify runtime credential and validation boundaries.

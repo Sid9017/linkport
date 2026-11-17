@@ -1,0 +1,28 @@
+[Unit]
+Description=Linkport encrypted iroh relay
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=linkport-relay
+Group=linkport-relay
+ExecStart=/usr/local/bin/linkport-relay --listen 0.0.0.0:3340 --tls-cert /etc/linkport-relay/fullchain.pem --tls-key /etc/linkport-relay/privkey.pem --max-connections 128 --client-bytes-per-second 4194304
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=15s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+UMask=0077
+LimitNOFILE=1024
+# Queue allowance alone can approach 1 GiB at 128 connected clients.
+# Tune both the connection cap and memory limit for the host's capacity.
+MemoryMax=2G
+TasksMax=256
+
+[Install]
+WantedBy=multi-user.target

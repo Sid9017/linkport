@@ -453,8 +453,11 @@ globalThis.initializeLinkportLive = (root, request, motion, monitor) => {
   }
   function render() {
     const network = state.network;
-    const label = network.restartRequired ? "请重启 Linkport" : network.state === "Running" ? "iroh 已就绪" : "网络未运行";
+    const label = network.restartRequired ? "请重启 Linkport" : network.state !== "Running" ? "网络未运行" :
+      network.config?.relayMode === "disabled" ? "仅直连" :
+      network.relayConnected ? "中继已连接" : "中继未连接";
     find("[data-network-state]").textContent = label;
+    find("[data-network-state]").title = network.relayError || network.homeRelay || "";
     find("[data-host-name]").textContent = network.hostName || "本机";
     find("[data-host-ip]").textContent = network.nodeID ? network.nodeID.slice(0, 12) + "…" : "—";
     find("[data-host-ip]").title = network.nodeID || "";

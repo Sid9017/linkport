@@ -15,7 +15,9 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/Sid9017/linkport/internal/relayservice"
 	"github.com/gofrs/flock"
+
 	"github.com/tmc/go-iroh/endpointticket"
 	"github.com/tmc/go-iroh/key"
 )
@@ -30,17 +32,20 @@ type Peer struct {
 // NetworkConfig is applied at startup. Public address publication contains only
 // relay addresses, never the port inventory or private LAN addresses.
 type NetworkConfig struct {
-	RelayMode    string   `json:"relayMode"` // default, custom, disabled
-	RelayURLs    []string `json:"relayURLs"`
-	DiscoveryURL string   `json:"discoveryURL,omitempty"`
+	RelayMode    string                  `json:"relayMode"` // default, custom, disabled
+	RelayURLs    []string                `json:"relayURLs"`
+	DiscoveryURL string                  `json:"discoveryURL,omitempty"`
+	HostedRelay  relayservice.HostConfig `json:"hostedRelay,omitzero"`
 }
 
 type diskState struct {
-	Version int           `json:"version"`
-	Seed    string        `json:"seed"`
-	Name    string        `json:"name"`
-	Peers   []Peer        `json:"peers"`
-	Network NetworkConfig `json:"network"`
+	Version      int                      `json:"version"`
+	Seed         string                   `json:"seed"`
+	Name         string                   `json:"name"`
+	Peers        []Peer                   `json:"peers"`
+	Network      NetworkConfig            `json:"network"`
+	DiscoverySeq uint64                   `json:"discoverySeq,omitempty"`
+	Discovery    map[string]AddressRecord `json:"discovery,omitempty"`
 }
 
 // Store owns an exclusive process lock: two Linkport processes must not silently
@@ -147,6 +152,25 @@ func validateState(state diskState) error {
 		}
 		seen[peer.ID] = true
 	}
+	if err := validateHostedRelay(state.Network.HostedRelay); err != nil {
+		return err
+	}
+	if len(state.Discovery) > 129 {
+		return errors.New("discovery cache limit exceeded")
+	}
+	secret, _ := key.ParseSecretKey(state.Seed)
+	self := secret.Public().String()
+	for id, r := range state.Discovery {
+		if id != r.ID || (id != self && !seen[id]) {
+			return errors.New("unpaired discovery cache entry")
+		}
+		if err := r.verify(); err != nil {
+			return err
+		}
+		if id == self && r.Sequence > state.DiscoverySeq {
+			return errors.New("invalid local discovery sequence")
+		}
+	}
 	return nil
 }
 
@@ -242,6 +266,8 @@ func (store *Store) forget(id string) error {
 	defer store.mu.Unlock()
 	next := store.state
 	next.Peers = []Peer{}
+	next.Discovery = cloneRecords(next.Discovery)
+	delete(next.Discovery, id)
 	for _, peer := range store.state.Peers {
 		if peer.ID != id {
 			next.Peers = append(next.Peers, peer)
@@ -283,6 +309,8 @@ func (store *Store) ResetIdentity(confirmation string) error {
 	seed := fresh.Bytes()
 	next := store.state
 	next.Seed = hex.EncodeToString(seed[:])
+	next.DiscoverySeq = 0
+	next.Discovery = nil
 	next.Peers = []Peer{}
 	return store.commit(next)
 }

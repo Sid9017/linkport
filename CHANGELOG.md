@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.0.2 — release channels and pairing fixes
+
+- Keep the Tokyo relay bundled with the application, retain its operator signature,
+  and disable independent relay-directory checks and legacy cache overrides.
+- Extend single-use invitations to eight hours, accept copied whitespace and invisible
+  separators, and report prefix, encoding, expiry and connection errors separately.
+- Include bounded LAN interface candidates for wildcard-bound iroh endpoints.
+- Show actual relay connectivity and the last error. User-reported two-machine
+  invitation pairing succeeded; public-network and hardware limits remain documented.
+- Add distinct Stable, Nightly and Dev package versions. Dev builds carry commit
+  metadata and do not update themselves. Stable and Nightly only use their own channel.
+- Publish complete signed CLI and desktop packages for macOS, Windows and Linux on
+  amd64 and arm64 after the full compatibility checks. Every desktop update must
+  pass SHA-256 and the embedded publisher's Ed25519 verification.
+- Provide website downloads, public installation instructions, generated version
+  notes and an anonymous update endpoint, independently of private source access.
+- Preserve the device identity, pairings and explicit application restart on upgrades.
+- macOS packages remain unnotarized. Real USB serial, cross-network NAT and Windows
+  com0com driver behavior still require verification in their target environments.
+
 ## 0.0.1 — development preview
 
 This is an early framework and design review preview. Serial application

@@ -1,4 +1,4 @@
-name: Draft release
+name: Publish release
 
 on:
   push:
@@ -6,9 +6,19 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing tag to validate and build (e.g. v0.0.1)
+        description: Existing stable or nightly tag to validate, build and publish
         required: true
         type: string
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+    secrets:
+      LINKPORT_UPDATE_PUBLIC_KEY:
+        required: true
+      LINKPORT_UPDATE_PRIVATE_KEY:
+        required: true
 
 permissions:
   contents: read
@@ -23,6 +33,7 @@ jobs:
     outputs:
       commit: ${{ steps.source.outputs.commit }}
       tag: ${{ steps.source.outputs.tag }}
+      channel: ${{ steps.source.outputs.channel }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -40,6 +51,11 @@ jobs:
           python scripts/release.py --validate-only --tag "$RELEASE_TAG"
           echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           echo "tag=$RELEASE_TAG" >> "$GITHUB_OUTPUT"
+          if [[ "$RELEASE_TAG" == *-nightly.* ]]; then
+            echo "channel=nightly" >> "$GITHUB_OUTPUT"
+          else
+            echo "channel=stable" >> "$GITHUB_OUTPUT"
+          fi
 
   build:
     needs: validate
@@ -50,7 +66,7 @@ jobs:
     secrets:
       LINKPORT_UPDATE_PUBLIC_KEY: ${{ secrets.LINKPORT_UPDATE_PUBLIC_KEY }}
 
-  draft:
+  publish:
     needs: [validate, build]
     runs-on: ubuntu-24.04
     permissions:
@@ -86,16 +102,17 @@ jobs:
           merge-multiple: true
       - name: Verify desktop archives and sign updates
         env:
+          RELEASE_TAG: ${{ needs.validate.outputs.tag }}
           LINKPORT_UPDATE_PRIVATE_KEY: ${{ secrets.LINKPORT_UPDATE_PRIVATE_KEY }}
           LINKPORT_UPDATE_PUBLIC_KEY: ${{ secrets.LINKPORT_UPDATE_PUBLIC_KEY }}
         run: |
           python - <<'PY'
-          import hashlib
+          import hashlib, os
           from pathlib import Path
           import sys
           sys.path.insert(0, "scripts")
           import release
-          version = release.read_version()
+          version, channel = release.build_version(release.read_version(), os.environ["RELEASE_TAG"])
           names = {f"linkport-desktop_{version}_{os}_{arch}.zip" for os, arch in release.TARGETS}
           actual = {p.name for p in Path("dist/desktop").glob("*.zip")}
           if actual != names:
@@ -103,22 +120,27 @@ jobs:
           lines = [f"{hashlib.sha256((Path('dist/desktop') / name).read_bytes()).hexdigest()}  {name}\n" for name in sorted(names)]
           Path("dist/desktop/desktop-checksums.txt").write_text("".join(lines), encoding="utf-8")
           PY
-          if [[ -n "$LINKPORT_UPDATE_PRIVATE_KEY" || -n "$LINKPORT_UPDATE_PUBLIC_KEY" ]]; then
-            test -n "$LINKPORT_UPDATE_PRIVATE_KEY"
-            test -n "$LINKPORT_UPDATE_PUBLIC_KEY"
-            go run ./tools/update-sign -sign-dir dist/desktop
-          fi
-      - name: Create draft preview with all assets
+          test -n "$LINKPORT_UPDATE_PRIVATE_KEY"
+          test -n "$LINKPORT_UPDATE_PUBLIC_KEY"
+          go run ./tools/update-sign -sign-dir dist/desktop
+          go run ./tools/update-sign -sign-dir dist
+      - name: Publish a complete signed release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ needs.validate.outputs.tag }}
+          RELEASE_CHANNEL: ${{ needs.validate.outputs.channel }}
+          RELEASE_COMMIT: ${{ needs.validate.outputs.commit }}
         run: |
+          python scripts/release-notes.py --tag "$RELEASE_TAG" --output dist/release-notes.md
+          args=()
+          if [[ "$RELEASE_CHANNEL" == "nightly" ]]; then args+=(--prerelease); fi
           gh release create "$RELEASE_TAG" \
             dist/*.tar.gz dist/*.zip dist/checksums.txt dist/desktop/*.zip dist/desktop/desktop-checksums.txt \
-            --verify-tag --draft --prerelease \
-            --title "Linkport $RELEASE_TAG — desktop preview" \
-            --notes-file CHANGELOG.md
-          if compgen -G 'dist/desktop/*.sig' > /dev/null; then
-            gh release upload "$RELEASE_TAG" dist/desktop/*.sig
-          fi
+            --verify-tag --draft "${args[@]}" --target "$RELEASE_COMMIT" \
+            --title "Linkport $RELEASE_TAG · $RELEASE_CHANNEL" \
+            --notes-file dist/release-notes.md
+          gh release upload "$RELEASE_TAG" dist/*.sig dist/desktop/*.sig
+          latest=false
+          if [[ "$RELEASE_CHANNEL" == "stable" ]]; then latest=true; fi
+          gh release edit "$RELEASE_TAG" --draft=false --latest="$latest"

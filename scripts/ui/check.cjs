@@ -30,6 +30,7 @@ async function initializePage(page) {
   await page.route("**/wails/runtime.js", route => route.fulfill({
     contentType: "application/javascript", body: runtime,
   }));
+  await page.route("**/native/v1/relay-update", route=>route.fulfill({contentType:"application/json",body:'{"state":"bundled","version":1}'}));
   await page.route("**/native/v1/update", route => route.fulfill({
     contentType: "application/json", body: '{"configured":false,"state":"unconfigured"}',
   }));
@@ -548,9 +549,15 @@ async function checkDeviceManagement(page, browserName) {
     }
     await route.fulfill({ contentType: "application/json", body: JSON.stringify(network) });
   });
+  let relayUpdate={state:"available",version:1,next:2};
+  await page.route("**/native/v1/relay-update",route=>route.fulfill({contentType:"application/json",body:JSON.stringify(relayUpdate)}));
+  await page.route("**/native/v1/relay-update/apply",route=>{
+    assert.equal(route.request().headers()["x-linkport-token"],"browser-test-only");
+    relayUpdate={state:"up-to-date",version:2};return route.fulfill({status:202,body:""});
+  });
   await page.route("**/native/v1/devices/invite", route => route.fulfill({
     contentType: "application/json",
-    body: JSON.stringify({ code: "linkport1.test-invitation", expiresAt: new Date(Date.now() + 300000).toISOString() }),
+    body: JSON.stringify({ code: "linkport1.test-invitation", expiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString() }),
   }));
   await page.route("**/native/v1/devices", async route => {
     const request = route.request();
@@ -583,6 +590,15 @@ async function checkDeviceManagement(page, browserName) {
     await route.fulfill({ contentType: "application/json", body: JSON.stringify(network) });
   });
   await page.goto(origin, { waitUntil: "networkidle" });
+  await page.locator("[data-update-badge]").waitFor({state:"visible"});
+  await page.locator("[data-update-badge]").click();
+  await page.locator("[data-relay-update-action]").click();
+  await page.locator("[data-update-badge]").waitFor({state:"hidden"});
+  relayUpdate={state:"bundled",version:1};
+  await page.waitForFunction(()=>document.querySelector("[data-relay-update-status]").textContent.includes("随应用更新"));
+  assert.equal(await page.locator("[data-relay-update-action]").isVisible(),false);
+  await page.locator("[data-settings-close]").click();
+
   await page.locator("[data-device-manager-open]").first().click();
   await checkCloseFrame(page, "[data-devices-close]");
   await page.waitForFunction(() => document.querySelector("[data-device-id]").textContent.length === 64);
@@ -628,10 +644,26 @@ async function checkDeviceManagement(page, browserName) {
   await page.waitForFunction(() => document.querySelector("[data-invitation]").value.startsWith("linkport1."));
   await settleMotion(page);
   assert.equal(await page.locator("[data-invitation]").inputValue(), "linkport1.test-invitation");
+  assert.match(await page.locator("[data-invitation-expiry]").innerText(), /8 小时/);
   assert.equal(await page.locator("[data-invitation-panel]").isVisible(), true);
   assert.ok((await page.locator("[data-devices-dialog]").boundingBox()).height > compactHeight + 30);
   await page.locator("[data-invite-copy]").click();
   assert.equal(await page.evaluate(() => window.copiedText), "linkport1.test-invitation");
+  await page.evaluate(() => {
+    navigator.clipboard.writeText = async () => { throw new Error("clipboard unavailable"); };
+    document.execCommand = command => {
+      if (command !== "copy") return false;
+      const input = document.querySelector("[data-invitation]");
+      window.copiedText = input.value.slice(input.selectionStart, input.selectionEnd);
+      return true;
+    };
+    window.copiedText = "";
+  });
+  await page.locator("[data-invite-copy]").click();
+  assert.equal(await page.evaluate(() => window.copiedText), "linkport1.test-invitation");
+  await page.evaluate(() => {
+    navigator.clipboard.writeText = async text => { window.copiedText = text; };
+  });
   await page.setViewportSize({ width: 1120, height: 600 });
   await page.locator("[data-pair-code]").fill("expired");
   await page.locator("[data-pair-add]").click();
@@ -658,29 +690,14 @@ async function checkDeviceManagement(page, browserName) {
   assert.equal(removed, true);
   await page.locator("[data-network-toggle]").click();
   await settleMotion(page);
-  assert.equal(await page.locator("[data-custom-relay-fields]").isVisible(), false);
-  assert.equal(await page.locator("[data-discovery-options]").isVisible(), false);
+  assert.equal(await page.locator("[data-relay-urls]").count(),0);
+  assert.equal(await page.locator("[data-discovery-url]").count(),0);
+  assert.equal(await page.locator("[data-hosted-relay-save]").count(),0);
+  assert.equal(await page.locator('[data-relay-mode] option[value="custom"]').count(),0);
   await page.locator("[data-relay-mode]").selectOption("default");
   await settleMotion(page);
-  assert.equal(await page.locator("[data-custom-relay-fields]").isVisible(), false);
-  assert.equal(await page.locator("[data-discovery-options]").isVisible(), true);
-  assert.equal(await page.locator("[data-discovery-url]").isVisible(), false);
-  await page.locator("[data-relay-mode]").selectOption("custom");
-  await settleMotion(page);
-  assert.equal(await page.locator("[data-custom-relay-fields]").isVisible(), true);
-  await page.locator("[data-relay-urls]").fill("https://relay.example.test");
-  await page.locator("[data-discovery-toggle]").click();
-  await page.locator("[data-discovery-url]").fill("https://discovery.example.test");
-  await settleMotion(page);
-  await page.screenshot({ path: path.join(output, `${browserName}-devices-custom.png`) });
-  await page.locator("[data-relay-mode]").selectOption("disabled");
-  await settleMotion(page);
-  assert.equal(await page.locator("[data-custom-relay-fields]").isVisible(), false);
-  assert.equal(await page.locator("[data-discovery-options]").isVisible(), false);
-  await page.locator("[data-relay-mode]").selectOption("custom");
-  await settleMotion(page);
-  assert.equal(await page.locator("[data-relay-urls]").inputValue(), "https://relay.example.test");
-  assert.equal(await page.locator("[data-discovery-url]").inputValue(), "https://discovery.example.test");
+  assert.equal(await page.locator("[data-network-mode-label]").innerText(),"公共中继");
+  await page.screenshot({path:path.join(output,`${browserName}-devices-managed.png`)});
   await page.locator("[data-relay-mode]").selectOption("disabled");
   await settleMotion(page);
   await page.locator("[data-network-save]").click();
@@ -730,11 +747,43 @@ async function checkDeviceManagement(page, browserName) {
   await page.locator("[data-settings-close]").click();
   await page.locator("[data-device-manager-open]").first().click();
   await page.locator("[data-network-toggle]").click();
-  await page.locator("[data-relay-mode]").selectOption("custom");
-  await page.locator("[data-discovery-toggle]").click();
-  assert.equal(await page.locator("[data-network-mode-label]").innerText(), "Custom relays");
+  await page.locator("[data-relay-mode]").selectOption("default");
+  assert.equal(await page.locator("[data-network-mode-label]").innerText(), "Public relays");
   await page.screenshot({ path: path.join(output, `${browserName}-devices-english.png`) });
   assert.deepEqual(errors, []);
+}
+
+async function checkApplicationUpdates(page, browserName) {
+  await initializePage(page);
+  let update = { configured: true, state: "available", version: "0.0.2-nightly.20261117000000.1", channel: "nightly", next: "0.0.2-nightly.20261118000000.2" };
+  let restarted = false;
+  await page.route("**/native/v1/update", route => route.fulfill({ contentType: "application/json", body: JSON.stringify(update) }));
+  await page.route("**/native/v1/update/download", route => {
+    assert.equal(route.request().headers()["x-linkport-token"], "browser-test-only");
+    update.state = "ready";
+    return route.fulfill({ status: 202, body: "" });
+  });
+  await page.route("**/native/v1/update/restart", route => {
+    restarted = true;
+    return route.fulfill({ status: 202, body: "" });
+  });
+  await page.goto(origin, { waitUntil: "networkidle" });
+  await page.locator("[data-update-badge]").waitFor({ state: "visible" });
+  assert.equal(await page.locator(".lp-version").innerText(), update.version);
+  await page.locator("[data-update-badge]").click();
+  assert.equal(await page.locator("[data-app-channel]").innerText(), "Nightly");
+  await page.locator("[data-update-action]").click();
+  await page.waitForFunction(() => document.querySelector("[data-update-action]").getAttribute("aria-label") === "重启并更新");
+  assert.equal(restarted, false, "download must not restart the application");
+  await page.screenshot({ path: path.join(output, `${browserName}-nightly-update-ready.png`) });
+  await page.locator("[data-update-action]").click();
+  assert.equal(restarted, true);
+  update = { configured: false, state: "development", version: "0.0.2-dev.1794913200.g012345abcdef", channel: "dev" };
+  await page.reload({ waitUntil: "networkidle" });
+  await page.locator("[data-settings-open]").click();
+  await page.waitForFunction(() => document.querySelector("[data-update-status]").textContent.includes("开发构建"));
+  assert.equal(await page.locator("[data-update-action]").isDisabled(), true);
+  assert.equal(await page.locator("[data-update-badge]").isVisible(), false);
 }
 
 (async () => {
@@ -754,6 +803,7 @@ async function checkDeviceManagement(page, browserName) {
       await checkFunctional(await context.newPage(), browserName);
       await checkEmptyLayout(await context.newPage(), browserName);
       await checkDeviceManagement(await context.newPage(), browserName);
+      await checkApplicationUpdates(await context.newPage(), browserName);
       results.push({ browser: browserName, platform, status: "passed", source: "isolated API fixtures and bundled Wails runtime" });
     } catch (error) {
       results.push({ browser: browserName, platform, status: "failed", error: error.stack || String(error) });
