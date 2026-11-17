@@ -22,9 +22,10 @@ Use lark skill to report progress to current user if possible. The message shoul
 
 ## Code Review Rules
 
-Report findings in Chinese. For each issue, identify its concrete trigger,
-impact and the changed code responsible. Focus on actionable regressions in
-security, byte integrity, resource ownership and platform behaviour.
+Use English for pull request descriptions and review comments. For each issue,
+identify its concrete trigger, impact and the changed code responsible. Focus on
+actionable regressions in security, byte integrity, resource ownership and
+platform behaviour.
 
 ### Device identity and authorization
 
