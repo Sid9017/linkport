@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -115,7 +116,7 @@ func TestPairingRequiresInvitationAndPinsBothPublicKeys(t *testing.T) {
 	}
 	// An invitation permits a handshake, never an unauthenticated inventory read.
 	b.mu.Lock()
-	b.pairing[payload.Peer.ID]++
+	b.pairing[payload.Peer.ID] = &pairingState{pending: 1}
 	b.mu.Unlock()
 	client := b.NewClient(payload.Peer.ID, 5*time.Second)
 	addr, _ := endpointticket.Decode(payload.Peer.Ticket)
@@ -189,6 +190,103 @@ func TestRevocationTerminatesActiveStreamsAndBlocksReconnect(t *testing.T) {
 		if resp.StatusCode == http.StatusOK {
 			t.Fatal("revoked device reconnected successfully")
 		}
+	}
+}
+
+func TestRemoveDeviceRevokesInvitationsAndDelayedPairRequests(t *testing.T) {
+	for _, delayed := range []bool{false, true} {
+		name := "request-after-removal"
+		if delayed {
+			name = "request-decoding-during-removal"
+		}
+		t.Run(name, func(t *testing.T) {
+			network, remote, other := testNetwork(t), testNetwork(t), testNetwork(t)
+			for _, peer := range []Peer{remote.self(), other.self()} {
+				if err := network.store.remember(peer); err != nil {
+					t.Fatal(err)
+				}
+			}
+			invitation, err := network.CreateInvitation()
+			if err != nil {
+				t.Fatal(err)
+			}
+			payload, err := parseInvitation(invitation.Code)
+			if err != nil {
+				t.Fatal(err)
+			}
+			body, err := json.Marshal(pairRequest{Peer: remote.self(), Token: payload.Token})
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			ctx = context.WithValue(ctx, peerContextKey{}, remote.Status().NodeID)
+			request := httptest.NewRequest(http.MethodPost, "/v1/pair", bytes.NewReader(body)).WithContext(ctx)
+			response := httptest.NewRecorder()
+			handler := network.Authorize(http.NotFoundHandler())
+			if delayed {
+				reader, writer := io.Pipe()
+				defer reader.Close()
+				defer writer.Close()
+				request.Body = reader
+				done := make(chan struct{})
+				go func() {
+					defer close(done)
+					handler.ServeHTTP(response, request)
+				}()
+				if _, err := writer.Write(body[:1]); err != nil {
+					t.Fatal(err)
+				}
+				if err := network.RemoveDevice(remote.Status().NodeID); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := writer.Write(body[1:]); err != nil {
+					t.Fatal(err)
+				}
+				writer.Close()
+				<-done
+			} else {
+				if err := network.RemoveDevice(remote.Status().NodeID); err != nil {
+					t.Fatal(err)
+				}
+				handler.ServeHTTP(response, request)
+			}
+			if response.Code != http.StatusForbidden || network.Trusted(remote.Status().NodeID) {
+				t.Fatalf("revoked invitation restored removed device: HTTP %d", response.Code)
+			}
+			if !network.Trusted(other.Status().NodeID) {
+				t.Fatal("removing one device revoked an independent peer")
+			}
+			fresh, err := network.CreateInvitation()
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := remote.AddDevice(ctx, fresh.Code); err != nil {
+				t.Fatalf("explicit fresh invitation could not pair: %v", err)
+			}
+		})
+	}
+}
+
+func TestLatePairingCannotReuseReplacementPairingState(t *testing.T) {
+	network, remote := testNetwork(t), testNetwork(t)
+	peer := remote.self()
+	original := &pairingState{pending: 1}
+	network.mu.Lock()
+	network.pairing[peer.ID] = original
+	network.mu.Unlock()
+	if err := network.RemoveDevice(peer.ID); err != nil {
+		t.Fatal(err)
+	}
+	replacement := &pairingState{pending: 1}
+	network.mu.Lock()
+	network.pairing[peer.ID] = replacement
+	network.mu.Unlock()
+	if _, err := network.rememberPairing(peer, original); err == nil || network.Trusted(peer.ID) {
+		t.Fatal("old pairing response reused the replacement operation to restore trust")
+	}
+	if _, err := network.rememberPairing(peer, replacement); err != nil || !network.Trusted(peer.ID) {
+		t.Fatalf("new explicit pairing could not establish trust: %v", err)
 	}
 }
 

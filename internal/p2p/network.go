@@ -63,6 +63,10 @@ type pairRequest struct {
 	Token string `json:"token"`
 }
 
+type pairingState struct {
+	pending int
+}
+
 type peerContextKey struct{}
 
 type Network struct {
@@ -77,7 +81,7 @@ type Network struct {
 	server    *http.Server
 	conns     map[string]map[*iroh.Conn]struct{}
 	invites   map[[32]byte]time.Time
-	pairing   map[string]int
+	pairing   map[string]*pairingState
 	restart   bool
 	stopped   bool
 	closeOnce sync.Once
@@ -91,7 +95,7 @@ func New(ctx context.Context, opts Options) (_ *Network, err error) {
 	ctx, cancel := context.WithCancel(ctx)
 	n := &Network{
 		ctx: ctx, store: store, cancel: cancel, conns: make(map[string]map[*iroh.Conn]struct{}),
-		invites: make(map[[32]byte]time.Time), pairing: make(map[string]int),
+		invites: make(map[[32]byte]time.Time), pairing: make(map[string]*pairingState),
 	}
 	defer func() {
 		if err != nil {
@@ -269,7 +273,7 @@ func (n *Network) dial(ctx context.Context, addr netaddr.EndpointAddr) (net.Conn
 	defer lock.Unlock()
 	n.mu.Lock()
 	closed := n.stopped || n.restart || n.endpoint == nil
-	allowed := n.store.Trusted(addr.ID.String()) || n.pairing[addr.ID.String()] > 0
+	allowed := n.store.Trusted(addr.ID.String()) || n.pairing[addr.ID.String()] != nil
 	n.mu.Unlock()
 	if closed {
 		return nil, errors.New("iroh 网络未运行")
@@ -399,7 +403,7 @@ func (c *challengeConn) Read(p []byte) (int, error) {
 func (n *Network) BeforeConnect(_ context.Context, addr netaddr.EndpointAddr, _ string) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if n.stopped || n.restart || (!n.store.Trusted(addr.ID.String()) && n.pairing[addr.ID.String()] == 0) {
+	if n.stopped || n.restart || (!n.store.Trusted(addr.ID.String()) && n.pairing[addr.ID.String()] == nil) {
 		return errors.New("device is not paired")
 	}
 	return nil
@@ -409,7 +413,7 @@ func (n *Network) AfterHandshake(_ context.Context, conn *iroh.Conn) error {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	id := conn.RemoteID().String()
-	allowed := n.store.Trusted(id) || n.pairing[id] != 0
+	allowed := n.store.Trusted(id) || n.pairing[id] != nil
 	for _, expires := range n.invites {
 		allowed = allowed || time.Now().Before(expires)
 	}
@@ -520,15 +524,21 @@ func (n *Network) AddDevice(ctx context.Context, code string) (Peer, error) {
 		n.mu.Unlock()
 		return Peer{}, errors.New("无法配对本机或未运行的网络")
 	}
-	n.pairing[payload.Peer.ID]++
+	pairing := n.pairing[payload.Peer.ID]
+	if pairing == nil {
+		pairing = &pairingState{}
+		n.pairing[payload.Peer.ID] = pairing
+	}
+	pairing.pending++
 	self := n.self()
 	n.mu.Unlock()
 	defer func() {
 		n.mu.Lock()
-		if n.pairing[payload.Peer.ID] > 1 {
-			n.pairing[payload.Peer.ID]--
-		} else {
-			delete(n.pairing, payload.Peer.ID)
+		if n.pairing[payload.Peer.ID] == pairing {
+			pairing.pending--
+			if pairing.pending == 0 {
+				delete(n.pairing, payload.Peer.ID)
+			}
 		}
 		n.mu.Unlock()
 	}()
@@ -558,9 +568,13 @@ func (n *Network) AddDevice(ctx context.Context, code string) (Peer, error) {
 	if _, err := validatePeer(peer); err != nil || peer.ID != payload.Peer.ID {
 		return Peer{}, errors.New("配对设备身份不匹配")
 	}
+	return n.rememberPairing(peer, pairing)
+}
+
+func (n *Network) rememberPairing(peer Peer, pairing *pairingState) (Peer, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
-	if n.stopped || n.restart || n.pairing[peer.ID] == 0 {
+	if n.stopped || n.restart || pairing == nil || n.pairing[peer.ID] != pairing {
 		return Peer{}, errors.New("配对已取消")
 	}
 	if err := n.store.remember(peer); err != nil {
@@ -622,6 +636,7 @@ func (n *Network) RemoveDevice(id string) error {
 	for conn := range n.conns[id] {
 		conns = append(conns, conn)
 	}
+	clear(n.invites)
 	delete(n.pairing, id)
 	n.mu.Unlock()
 	for _, conn := range conns {
