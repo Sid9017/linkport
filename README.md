@@ -1,118 +1,270 @@
 # Linkport
 
-Linkport 使用 iroh 在已配对的机器之间共享串口，把对方主动共享的串口映射到本机，并提供桌面日志监听和收发。无需第三方账号或独立 VPN 客户端。目标平台为 Windows、macOS、Linux，当前开发版本 **0.0.1**。
+**Use a serial port on another machine through a local virtual port.**
 
-桌面版使用真实数据：从本机信任名单读取已配对设备，通过 iroh 验证公钥身份并探测连通性，从操作系统枚举本机串口，并探测对端 Linkport 的实际共享清单。连接后通过 RFC 2217 数据通道建立本地 PTY/com0com 映射，监听和发送均作用于真实会话。独立的 `design` 命令保留演示稿，原生桌面不运行演示逻辑。
+Linkport connects paired devices over iroh and makes explicitly shared serial
+ports available to your existing tools. Run it on both machines, pair them with
+a single-use invitation, and choose which ports to share. No account or separate
+VPN client is required.
 
-## 文档
+The desktop app includes a serial monitor, text and HEX sending, and independent
+sessions for multiple ports. A headless CLI runs the sharing service on machines
+without a desktop.
 
-从 [文档索引](docs/README.md) 开始。完整设计分为 [端与云服务架构](docs/system-architecture.md)、
-[交互时序](docs/interaction-sequences.md) 和 [官网内容与展示方案](docs/website-brief.md)。
-它们分别说明当前实现的职责与数据边界、关键操作的交互过程，以及后续官网可使用的文案和素材。
+**Status:** 0.0.1 development preview. Windows, macOS, and Linux are target
+platforms. Automated tests exercise encrypted loopback connections and isolated
+serial fixtures; real hardware, drivers, and cross-network behavior still need
+validation in their target environments.
 
-## 原生桌面
+## How it works
+
+```text
+Your serial tool                                               Remote hardware
+       │                                                              │
+Local virtual port ←→ Linkport A ←── encrypted iroh ──→ Linkport B ←→ Serial port
+    PTY / com0com                  direct or relayed           explicitly shared
+```
+
+Each installation generates its own persistent device identity. Pairing verifies
+the peer's public key and establishes mutual trust. Ports start unshared, and
+pairing does not enable sharing automatically.
+
+iroh handles connection establishment, hole punching, and path selection. It can
+use a relay when a direct path is unavailable. Relays forward encrypted traffic;
+serial access decisions remain on the two devices. Address discovery helps locate
+a device, while its online status comes from an authenticated service probe.
+
+## Run the desktop app
+
+The CLI and desktop modules both pin **Go 1.26.11**. The desktop app uses
+**Wails v3.1.0** and has a separate Go module under `desktop/`.
+
+From a source checkout:
 
 ```sh
 cd desktop
 go run -tags production .
 ```
 
-桌面与 CLI 模块统一使用 Go 1.26.11。从仓库根目录执行 `python3 scripts/desktop.py` 可构建本机桌面归档；macOS 同时生成 `dist/desktop/Linkport.app`，可直接打开。关闭窗口默认保留菜单栏图标，菜单可重新打开连接/共享/监听、进入设置、添加设备或退出。
+Native builds require the platform's development dependencies. Linux needs GTK 4
+and WebKitGTK 6 development headers. macOS needs Xcode Command Line Tools;
+packaged macOS applications target macOS 14.5 or later. See the
+[desktop guide](docs/desktop.md) for build and packaging details.
 
-界面采用黑白灰、插座与线缆组成的扁平图形标识。固定侧栏与内容区适配窗口高度，日志独立滚动。右上角齿轮管理文字大小、语言、主题、关闭窗口行为和更新偏好。原生设置保存到本机，浏览器预览使用独立的本地偏好。页头和菜单栏的「添加设备」打开设备配对窗口，无登录步骤。
+To package the app for the current machine, run from the repository root:
 
-自动升级采用后台定时检查 GitHub Release、下载并校验、重启时替换的方式。没有内嵌发布公钥的开发包不会自动安装更新。配置签名和发布的完整流程见 [docs/desktop.md](docs/desktop.md)。
+```sh
+python3 scripts/desktop.py
+```
 
-两台机器分别运行 Linkport。在其中一台打开「设备与配对」生成邀请，将完整邀请复制到另一台的「另一台设备的邀请」，点击「添加设备」。邀请只可用一次、五分钟后过期；生成新邀请会使旧邀请失效。双方保存对方的设备公钥后，在共享端勾选串口，使用端选择机器/串口和波特率连接。外部工具打开界面中的实际本地映射路径，监听和发送作用于真实会话。
+Output goes to `dist/desktop/`. On macOS, this includes `Linkport.app` with an
+ad-hoc signature for local use; production signing and notarization are separate
+release work.
 
-设备身份持久化在用户配置目录 `linkport/devices.json`，包含本机私钥、已配对公钥和网络设置。Unix 文件权限为 `0600`；Windows 继承用户配置目录的访问控制。不要公开或复制此文件给其他机器。移除设备会撤销本机授权并断开该设备的会话；重置本机身份会生成新密钥并清空本机配对名单，其他机器还需移除旧设备并重新配对。详见 [docs/iroh.md](docs/iroh.md)。
+### Connect two machines
 
-默认使用公共 iroh 中继和地址发现，优先直连；公共地址发现只发布中继地址。局域网发现只帮助定位设备，不自动赋予串口访问权限。「网络与密钥」可改为自定义 HTTPS 中继/地址发现服务，或完全禁用公共服务的「仅直连」模式。保存会暂停网络，重启后应用；本机串口监听不受影响。该仓库不创建或部署中继服务器。
+1. Start Linkport on both machines.
+2. On one machine, open **Add device** and generate a pairing invitation.
+3. Transfer the complete invitation through a trusted channel and import it on
+   the other machine. Invitations expire after five minutes and can be used once.
+4. On the machine with the hardware, explicitly enable sharing for the desired
+   serial port.
+5. On the other machine, select the paired device, shared port, and serial
+   settings, then connect.
+6. Open the displayed local virtual port in your serial tool, or use Linkport's
+   built-in monitor.
 
-「监听」右上角的串口按钮也能直接打开本机串口：选择实际端口和波特率后开始监听，无需共享、网络连接或虚拟串口驱动。会话选择器区分本机与远端；关闭按钮释放当前串口，暂停只冻结显示。本机监听和远端访问共用物理端口占用管理，不能同时控制同一个串口；本机设备拔出会关闭对应会话并保留日志。
+Each connection has its own mapping and log. Disconnecting one session leaves
+other sessions running. A physical port has one owner at a time: local monitoring
+and remote sharing cannot control it simultaneously.
 
-本机串口约每秒检查一次，远端设备和共享清单在上次检查完成后约五秒再次刷新。一次探测失败不会主动拆除仍正常传输的会话。取消共享、设备移除或实际通道断开时，关闭受影响会话并保留日志；恢复后需重新连接。实际物理串口、跨机器网络和 Windows 驱动仍需按使用环境联调；自动化验证使用独立的本机 PTY 与隔离的模拟物理端。
+Paired devices exchange signed contact records and keep a local cache. If a saved
+address stops working, Linkport can ask another paired device for the target's
+new contact information. Discovery records never grant trust or serial access.
 
-## 桌面设计预览
+The desktop can also host the same relay implementation as the standalone service.
+Hosting is opt-in under device network settings, with TLS required for public
+listeners. See the [relay and discovery guide](docs/relay.md) for configuration,
+resource limits, multi-relay recovery and the current implementation boundaries.
+
+The monitor can also open a local serial port directly, without pairing,
+networking, or a virtual-port driver. Pausing freezes the display; closing a
+session releases its port. Removing a peer, stopping sharing, or unplugging a
+port closes the affected sessions. Reconnecting a terminated session is currently
+manual.
+
+## Run a headless sharing service
+
+Run these commands from the repository root. Replace the example port path with
+an actual path or identity reported by `ports`; use the actual `COMx` on Windows.
+
+```sh
+go run ./cmd/linkport ports
+go run ./cmd/linkport ports --json
+go run ./cmd/linkport share /dev/cu.usbserial-example
+```
+
+Pair before starting the long-running service:
+
+```sh
+# Machine A: print an invitation and stay online while B imports it.
+go run ./cmd/linkport invite
+
+# Machine B: import A's complete invitation.
+go run ./cmd/linkport pair 'linkport1.COMPLETE_INVITATION'
+
+# Machine A: stop the invitation process with Ctrl-C, then start sharing.
+go run ./cmd/linkport serve
+```
+
+Useful management commands:
+
+```sh
+go run ./cmd/linkport identity
+go run ./cmd/linkport devices
+go run ./cmd/linkport forget DEVICE_ID
+go run ./cmd/linkport unshare /dev/cu.usbserial-example
+```
+
+Device management commands require exclusive access to the device configuration.
+Exit the desktop or sharing process first, or use the running desktop app to
+manage devices. CLI sharing changes are picked up by the running sharing service.
+Flags precede positional arguments; use `--directory DIR` on device management
+commands or `--config FILE` on sharing commands when selecting other configuration
+locations. See [device and network configuration](docs/iroh.md) for details.
+
+## Networking and privacy
+
+The default configuration uses Linkport-maintained HTTPS relays and public address discovery,
+alongside LAN discovery. Public address records contain relay addresses, not
+serial inventories or logs. LAN discovery supplies contact information and does
+not grant access.
+
+Clients support two network modes:
+
+| Mode | Relay behavior | Address discovery |
+| --- | --- | --- |
+| `default` | Operator-signed Linkport relay directory | Paired-device exchange, public lookup, and LAN discovery |
+| `disabled` | No relay | No public discovery; direct addresses and LAN discovery |
+
+Public relay addresses cannot be edited by end users. The embedded directory
+currently includes `https://207.148.110.58` in Tokyo. Its signed JSON is served at
+`https://207.148.110.58/relay-directory.json`; desktop verifies the embedded operator
+key and monotonic version before applying a directory update. Legacy custom
+configuration migrates to the maintained defaults without replacing device identity
+or pairings. Peer advertisements cannot add arbitrary outbound relay candidates.
+
+```sh
+go run ./cmd/linkport network --relay-mode default
+go run ./cmd/linkport network --relay-mode disabled
+```
+
+Desktop checks for both application and relay-directory updates, displays an update
+badge, and automatically downloads signed application updates or applies verified
+relay directories when background updates are enabled. Application installation
+still requires an explicit restart. Turning automatic updates off keeps checks and
+manual actions available. Failed directory checks preserve the last working set;
+direct-only mode stays disabled when a new directory is cached.
+
+The relay module remains reusable by operator code and the standalone command;
+ordinary desktop users cannot configure a public relay listener. Deployment and
+validation evidence is recorded in [the Tokyo deployment report](docs/relay-deployment.md).
+Saving the network mode pauses the old transport and requires an app restart;
+independent local monitoring continues to work.
+
+Device identity, trusted peers, and network settings are stored in
+`os.UserConfigDir()/linkport/devices.json`. **This file contains the device's
+private key. Keep it private and do not copy it between devices.** Unix files use
+`0600` permissions; Windows inherits the configuration directory's access controls.
+Sharing choices are stored separately in `linkport/shares.json`.
+
+Removing a peer revokes its local access and disconnects its streams. Resetting
+identity generates a new key and clears the local trust list; other machines
+must remove the old identity and pair again. A local reset cannot revoke a key
+from another machine's trust list.
+
+Relays cannot decrypt serial content, but their operators can observe connection
+metadata and relayed traffic volume. Metadata retention depends on the operator.
+The project uses the pinned community implementation
+`github.com/tmc/go-iroh v0.3.0`, which is not the official n0 Go SDK.
+
+## Platform support and limits
+
+| Platform | Local virtual port | Requirements and limits |
+| --- | --- | --- |
+| macOS / Linux | PTY | Created automatically; no physical DTR/RTS passthrough. Parameter polling may miss rapid intermediate changes. |
+| Windows | com0com pair | Install a compatible driver and configure port pairs beforehand. Each simultaneous session needs a separate pair. The driver is not bundled. |
+
+On Windows, enter the application end and Linkport end of an existing com0com
+pair when connecting. An arm64 application build does not establish arm64 driver
+compatibility. On macOS/Linux, Linkport creates per-session links under
+`~/.linkport/dev/` and removes them on disconnect.
+
+The data channel uses RFC 2217 inside authenticated, encrypted iroh streams. It
+preserves binary bytes and handles supported serial settings and control updates.
+Hardware flow control and sustained BREAK are not implemented. Physical modem
+signals remain subject to the adapter and virtual-port capabilities.
+
+Ports with reliable USB serial numbers can be identified across replugging.
+Otherwise, identity falls back to the device path; replacement hardware at the
+same path may not be distinguishable. Ambiguous duplicate identities require
+local confirmation.
+
+Loopback tests do not establish universal NAT traversal, Rust iroh interoperability,
+USB hardware compatibility, or public-relay availability. See
+[CI and compatibility testing](docs/ci.md) for the exact verification scope.
+
+## Development
+
+Run the backend checks from the repository root and the desktop check from its
+own module:
+
+```sh
+go test -race -count=1 -timeout=5m ./...
+go vet ./...
+
+cd desktop
+go test -tags production -count=1 -timeout=5m ./...
+```
+
+Root-module checks do not exercise the desktop module. Browser integration uses
+isolated fixtures; setup and commands are in [docs/ci.md](docs/ci.md).
+
+To view the desktop design with demo devices and traffic:
 
 ```sh
 go run ./cmd/linkport design
 ```
 
-打开 `http://127.0.0.1:7710`。左侧只保留「连接、共享、监听、插件」导航，右侧展示对应内容。连接画布显示本机、对端机器/串口及映射路径，完整日志在监听区。系统自动识别。节点用虚线边框与曲线连接，已连接曲线流动，收发时有方向光点；系统减少动态效果设置会关闭动画。
+Open `http://127.0.0.1:7710`. This preview does not access real serial hardware.
+The native desktop app uses actual devices and sessions. The separate
+`serve --local-api` mode exposes a loopback, read-only development API; it does
+not expose the real remote serial data channel.
 
-设计稿可以演示连接、断开、共享选择、日志筛选、暂停、文本/HEX、发送和导出；插拔样例通过设计场景参数提供。设备清单和串口流量为演示数据，不会访问真实串口。字体随包嵌入，SVG 图标为本项目绘制。
+Routine CI runs **five runner jobs**: three native backend/desktop jobs for
+Windows, Linux, and macOS, plus Linux and Windows frontend jobs. Full builds for
+all six platform/architecture combinations run on manual full checks or releases.
+Actual com0com driver tests require a dedicated runner and manual dispatch.
 
-可同时连接多个机器/串口，连接区按会话展示独立映射；监听区可切换会话，分别暂停、清空、发送或导出日志。断开一个会话不会影响其他会话。
+Build CLI archives with `python3 scripts/release.py`; validate the packaging
+script with `python3 scripts/release.py --self-test`. Desktop packages use
+`scripts/desktop.py`. Release automation creates draft prereleases. Signed updates
+require configured release signing keys; development packages without an embedded
+update-verification key do not install updates automatically. See the
+[release guide](docs/releasing.md).
 
-设计说明见 [DESIGN.md](DESIGN.md)，原始稿位于 `docs/design/desktop-review.fragment.html`。
+## Documentation
 
-编辑设计稿时可用 `go run ./cmd/linkport design --source docs/design/desktop-review.fragment.html`，刷新浏览器即可读取修改；默认命令使用内嵌版本。
-
-## 本机清单与共享规则
-
-需要 Go 1.26.11 或兼容工具链。macOS 完整 USB 身份枚举需要 Xcode Command Line Tools/IOKit；禁用 cgo 时可枚举路径，但没有 USB 序列号身份信息。
-
-```sh
-go run ./cmd/linkport version
-go run ./cmd/linkport ports
-go run ./cmd/linkport ports --json
-go run ./cmd/linkport share /dev/cu.usbserial-example
-go run ./cmd/linkport unshare /dev/cu.usbserial-example
-```
-
-替换示例设备路径为 `ports` 输出中的实际路径或身份 ID。Windows 端使用实际 `COMx`。参数放在串口路径前，例如 `share --config /tmp/linkport-shares.json /dev/example`。
-
-所有串口默认未共享，规则保存在 `os.UserConfigDir()/linkport/shares.json`。有 USB 序列号时按 VID/PID/序列号识别重插的设备；无可靠序列号时退回路径，无法保证区分同一路径上的替换硬件。重复 USB 身份会暂停自动匹配，需在本机重新确认。配置文件原子替换，但多个进程同时修改仍采用最后一次写入的结果。
-
-```sh
-go run ./cmd/linkport watch
-go run ./cmd/linkport serve
-go run ./cmd/linkport serve --local-api
-```
-
-`watch` 每秒左右枚举并输出已共享清单的 JSON 快照。运行中的进程同时读取共享配置变化，CLI 的共享/取消共享选择会传播到监听器。
-
-`serve` 运行 iroh 共享端，适用于无桌面的 Linux 等机器。首次配对可以先在共享端运行 `go run ./cmd/linkport invite`，保持进程在线；另一台运行 `go run ./cmd/linkport pair '完整邀请'`。配对结束后退出邀请进程，再运行 `serve`。`identity` 查看本机公钥，`devices` 列出已配对设备，`forget DEVICE_ID` 撤销授权。这些设备管理命令需要独占设备配置；桌面或共享端运行时，请使用桌面的设备管理入口，或先退出占用配置的进程。
-
-网络 API 在经过设备身份认证的 iroh 双向流中运行，不绑定公网 TCP 7700：
-
-| 接口 | 内容 |
+| Topic | Guide |
 | --- | --- |
-| `POST /v1/pair` | 仅使用有效单次邀请建立双向配对；公钥必须匹配真实握手身份 |
-| `GET /v1/info` | 版本、本机公钥与能力 |
-| `GET /v1/ports` | 仅已共享串口的最新快照 |
-| `GET /v1/events` | SSE 完整快照，首次连接和状态变化时推送 |
-| `POST /v1/connect?id=...&baud=...` | 仅配对设备可升级为 RFC 2217 数据通道，且端口必须显式共享、在线并空闲 |
+| Product scope | [PRODUCT.md](PRODUCT.md) |
+| Documentation index | [docs/README.md](docs/README.md) |
+| Devices, relays, discovery, and data ownership | [System architecture](docs/system-architecture.md) |
+| Pairing, connections, and revocation flows | [Interaction sequences](docs/interaction-sequences.md) |
+| Identity and network configuration | [iroh guide](docs/iroh.md) |
+| Serial adapters and runtime modules | [Runtime architecture](docs/architecture.md) |
+| Desktop, monitoring, and updates | [Desktop guide](docs/desktop.md) |
+| Tests and platform verification | [CI guide](docs/ci.md) |
+| Builds, signing, and releases | [Release guide](docs/releasing.md) |
 
-HTTP 中的设备 ID 或来源地址不能替代 QUIC 握手验证的公钥。探测不跟随重定向或使用系统 HTTP 代理，清单大小与并发有界。未知设备默认拒绝；邀请有效期内允许进行配对握手，但仍无法读取串口清单。`serve --local-api` 单独提供原有 loopback 只读开发接口，不开放真实远端串口通道。
-
-## 虚拟串口
-
-`internal/vport` 的统一接口包括 `Read/Write/Close`、`Path()`、`Events()`、`Capabilities()` 和 `SetModemStatus()`。
-
-| 平台 | 实现 | 限制 |
-| --- | --- | --- |
-| macOS / Linux | `pty_unix.go` | 纯用户态；可观察终端参数，DTR/RTS 不透传；PTY 参数轮询不能保证快速变化的每一个中间状态 |
-| Windows | `com0com_windows.go` | 依赖兼容的 com0com 驱动与预建端口对；可观察配对端参数和控制线；默认接线只能呈现部分 modem 输入 |
-
-Windows 的 `Options.Path` 是应用打开的端口，如 `COM10`；`PairDevice` 是 Linkport 打开的另一端，如 `CNCB0`。构建 Windows arm64 程序不代表已验证 com0com arm64 驱动可用。驱动不随包分发。三平台虚拟串口能力均在首版范围内。
-
-Windows 桌面连接时填写已存在的正确端口对，每条并行连接需要独立的一对。macOS/Linux 自动创建 `~/.linkport/dev/<主机>-<会话 ID>`，断开时移除链接。RFC 2217 实现二进制转义、协商、波特率/数据位/校验/停止位确认及可用的 DTR/RTS、modem 状态；不提供硬件流控或持续 BREAK 控制。内置发送与外部程序写入会在同一会话中串行化。
-
-## 构建、检查与 Release
-
-```sh
-go test -race ./...
-go vet ./...
-python3 scripts/release.py --self-test
-python3 scripts/release.py
-```
-
-本机构建输出到 `dist/`，包含二进制、版本与说明、字体许可证和 SHA-256 校验文件。macOS 归档目前未签名和公证。
-
-GitHub Actions 的手动全量检查和发版流程对 macOS/Linux/Windows 的 amd64、arm64 分别构建 CLI 与 Wails 桌面归档。已有的 `v0.0.1` tag 必须与 `VERSION` 和提交一致，Release workflow 才会汇总归档并创建 **Draft / Pre-release**。工作流不会自动公开发布；发布签名只在配置对应密钥后生成。
-
-PR 和 `main` 推送运行 Windows、Linux、macOS 三个 CI 流程，日常共五个 runner job：三平台各一个原生后端/虚拟串口/桌面模块检查，加 Linux 和 Windows 前端检查。功能分支不再重复触发 push 检查，新提交取消旧的 PR 检查。Unix 使用真实 PTY 和 race 检查；Windows 验证适配器、com0com 解码器并编译驱动测试。双架构、macOS 浏览器检查和安装包生成放到手动全量或发版流程，真实 com0com 驱动只在专用 runner 上手动测试。日常只保存失败报告，完整检查报告保留三天、归档保留七天。覆盖范围和操作方式见 [docs/ci.md](docs/ci.md)。
-
-完整流程见 [docs/releasing.md](docs/releasing.md)，架构与代码树见 [docs/architecture.md](docs/architecture.md)。
+Some detailed documents are currently written in Chinese.

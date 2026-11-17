@@ -1,0 +1,26 @@
+[Unit]
+Description=Linkport encrypted iroh relay
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=linkport-relay
+Group=linkport-relay
+ExecStart=/usr/local/bin/linkport-relay --listen 127.0.0.1:3340 --max-connections 16 --client-bytes-per-second 4194304
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=15s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+UMask=0077
+LimitNOFILE=256
+MemoryMax=512M
+TasksMax=128
+
+[Install]
+WantedBy=multi-user.target

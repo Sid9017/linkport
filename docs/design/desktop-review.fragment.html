@@ -366,7 +366,7 @@
   <div class="lp-window" aria-label="Linkport 桌面设计预览，所有数据均为演示">
     <header class="lp-titlebar">
       <div class="lp-brand"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-logo"/></svg>Linkport <span class="lp-version">0.0.1</span></div>
-      <div class="lp-titletools"><span class="lp-caption lp-preview-label">演示数据</span><button type="button" class="lp-plain lp-netstate" data-device-manager-open aria-label="设备与配对"><span class="lp-dot"></span><span data-network-state>iroh</span></button><button type="button" class="lp-iconbutton" data-settings-open aria-label="设置"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-settings"/></svg></button></div>
+      <div class="lp-titletools"><span class="lp-caption lp-preview-label">演示数据</span><button type="button" class="lp-plain lp-netstate" data-device-manager-open aria-label="设备与配对"><span class="lp-dot"></span><span data-network-state>iroh</span></button><button type="button" class="lp-plain" data-update-badge hidden>有更新</button><button type="button" class="lp-iconbutton" data-settings-open aria-label="设置"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-settings"/></svg></button></div>
     </header>
     <main class="lp-layout">
       <nav class="lp-sidebar" aria-label="主导航">
@@ -483,11 +483,12 @@
       </div>
       <div class="lp-settings-section">
       <label class="lp-setting"><span>关闭后后台运行</span><input class="lp-switch" type="checkbox" role="switch" data-preference="closeToTray" checked aria-label="关闭后后台运行"></label>
-      <label class="lp-setting"><span>后台检查并下载更新</span><input class="lp-switch" type="checkbox" role="switch" data-preference="autoUpdate" checked aria-label="后台检查并下载更新"></label>
+      <label class="lp-setting"><span class="lp-setting-info"><span>后台自动更新</span><span class="lp-settings-status">关闭后仍检查更新</span></span><input class="lp-switch" type="checkbox" role="switch" data-preference="autoUpdate" checked aria-label="后台自动更新"></label>
       </div>
       <div class="lp-settings-section">
         <div class="lp-setting"><div class="lp-setting-info"><span>网络与设备</span><span class="lp-settings-status" data-network-status>无需账号，通过邀请配对</span></div><button type="button" data-device-manager-open>管理设备</button></div>
         <div class="lp-setting"><div class="lp-setting-info"><span>Linkport <code>0.0.1</code></span><span class="lp-settings-status" data-update-status>桌面版中检查更新</span></div><button type="button" class="lp-iconbutton" data-update-action aria-label="检查更新"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-refresh"/></svg></button></div>
+        <div class="lp-setting"><div class="lp-setting-info"><span>公共中继配置</span><span class="lp-settings-status" data-relay-update-status>等待检查</span></div><button type="button" data-relay-update-action>检查更新</button></div>
       </div>
     </div>
   </dialog>
@@ -513,13 +514,10 @@
       <div class="lp-settings-section">
         <button type="button" class="lp-disclosure" data-disclosure data-network-toggle aria-expanded="false" aria-controls="lp-network-options"><span>网络设置</span><span class="lp-disclosure-note" data-network-mode-label>公共中继</span><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-chevron"/></svg></button>
         <div id="lp-network-options" class="lp-reveal-content" hidden>
-          <label class="lp-setting"><span>中继模式</span><select data-relay-mode aria-label="中继模式"><option value="default">公共中继</option><option value="custom">自定义中继</option><option value="disabled">仅直连</option></select></label>
-          <div data-custom-relay-fields hidden><label class="lp-device-field"><span>自定义中继地址</span><textarea rows="2" data-relay-urls aria-label="自定义中继地址" placeholder="每行一个 HTTPS 地址"></textarea></label></div>
-          <div data-discovery-options>
-            <button type="button" class="lp-disclosure" data-disclosure data-discovery-toggle aria-expanded="false" aria-controls="lp-discovery-fields"><span>地址发现</span><span class="lp-disclosure-note" data-discovery-mode-label>默认</span><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-chevron"/></svg></button>
-            <div id="lp-discovery-fields" class="lp-reveal-content" hidden><label class="lp-device-field"><span>自定义地址发现服务</span><input data-discovery-url aria-label="自定义地址发现服务" placeholder="可选的 HTTPS pkarr 服务地址"></label><p class="lp-settings-status">留空使用当前模式的默认发现方式。</p></div>
-          </div>
-          <p class="lp-settings-status" data-network-mode-help>默认使用公共中继与地址发现。</p>
+          <label class="lp-setting"><span>中继模式</span><select data-relay-mode aria-label="中继模式"><option value="default">公共中继</option><option value="disabled">仅直连</option></select></label>
+          <p class="lp-settings-status">公共中继由 Linkport 维护，地址来自经过签名验证的中继目录。</p>
+          <p class="lp-settings-status" data-public-relays></p>
+          <p class="lp-settings-status" data-network-mode-help>使用 Linkport 维护的公共中继与协同发现。</p>
           <div class="lp-device-actions"><button type="button" data-network-save>保存并暂停网络</button></div>
           <p class="lp-settings-status">重启后生效。远端会话将断开，本机监听继续运行。</p>
         </div>
@@ -1037,6 +1035,7 @@
   let preferenceRevision = 0;
   let saveQueue = Promise.resolve();
   let updateState = { configured: false, state: "unconfigured" };
+  let relayUpdateState = {state:"idle"};
   let networkState = null;
   let settingsPoll = null;
   const settingsDialog = find("[data-settings-dialog]");
@@ -1086,7 +1085,7 @@
     "默认": "Default",
     "已自定义": "Custom",
     "留空使用当前模式的默认发现方式。": "Leave empty to use this mode’s default discovery.",
-    "默认使用公共中继与地址发现。": "Uses public relays and address discovery.",
+    "使用 Linkport 维护的公共中继与协同发现。": "Uses public relays and address discovery.",
     "使用自建中继；地址发现可单独配置。": "Uses your relays; discovery can be configured separately.",
     "仅使用邀请地址与局域网发现。": "Uses invitation addresses and LAN discovery only.",
     "重启后生效。远端会话将断开，本机监听继续运行。": "Restart to apply. Remote sessions disconnect; local monitoring continues.",
@@ -1135,6 +1134,26 @@
     "移除并断开": "Remove and disconnect",
     "网络与设备": "Network and devices",
     "网络与密钥": "Network and keys",
+    "本机提供中继": "Host a relay",
+    "未启用": "Disabled",
+    "运行中": "Running",
+    "允许本机提供中继": "Allow this device to host a relay",
+    "监听地址": "Listen address",
+    "中继监听地址": "Relay listen address",
+    "对外 HTTPS 地址": "Public HTTPS URL",
+    "中继对外地址": "Relay public URL",
+    "TLS 证书文件": "TLS certificate file",
+    "中继证书文件": "Relay certificate file",
+    "TLS 私钥文件": "TLS private key file",
+    "中继私钥文件": "Relay private key file",
+    "证书文件的完整路径": "Full path to certificate file",
+    "私钥文件的完整路径": "Full path to private key file",
+    "连接上限": "Connection limit",
+    "中继连接上限": "Relay connection limit",
+    "应用中继设置": "Apply relay settings",
+    "本机中继已启动。": "Local relay started.",
+    "本机中继已停用。": "Local relay stopped.",
+    "默认关闭。公网监听需要 TLS，且其他设备必须能访问该入口。更换监听配置前请先停用。": "Disabled by default. Public listening requires TLS and a reachable entry point. Disable before changing the listener.",
     "中继模式": "Relay mode",
     "公共中继": "Public relays",
     "自定义中继地址": "Custom relay URLs",
@@ -1171,7 +1190,7 @@
     "暂无会话": "No sessions",
     "导出完整会话": "Export full session",
     "演示数据": "Demo data",
-    "后台检查并下载更新": "Check and download updates in background",
+    "后台自动更新": "Automatic updates",
     "设计预览 · 演示数据": "Design preview · Demo data",
     "请在浏览器中完成登录": "Complete sign-in in your browser",
     "桌面版中检查更新": "Check updates in the desktop app",
@@ -1194,6 +1213,17 @@
     "发现新版本": "New version available",
     "下载更新": "Download update",
     "检查更新": "Check for updates",
+    "有更新": "Update available",
+    "关闭后仍检查更新": "Keep checking when disabled",
+    "公共中继配置": "Public relay configuration",
+    "等待检查": "Waiting to check",
+    "已是最新配置": "Configuration is up to date",
+    "有中继配置更新": "Relay configuration update available",
+    "检查失败": "Check failed",
+    "暂不可用": "Unavailable",
+    "更新中继配置": "Update relay configuration",
+    "公共中继由 Linkport 维护，地址来自经过签名验证的中继目录。": "Public relays are maintained by Linkport using a signed directory.",
+    "使用 Linkport 维护的公共中继与协同发现。": "Use Linkport public relays and peer-assisted discovery.",
     "设备与串口": "Devices and ports",
     "本地映射": "Local ports",
     "设备离线": "Device offline",
@@ -1309,6 +1339,7 @@
     if (!nativeDesktop) return;
     try {
       networkState = await nativeRequest("network");
+      find("[data-public-relays]").textContent = (networkState.publicRelays || []).join(" · ");
       find("[data-network-status]").textContent = networkState.restartRequired ? "请重启 Linkport 使配置生效" : networkState.state === "Running" ? "设备身份已就绪，无需登录" : "网络未运行";
       const identity = networkState.nodeID || "";
       find("[data-device-id]").textContent = identity || "—";
@@ -1319,9 +1350,14 @@
   async function refreshUpdate() {
     if (!nativeDesktop) return;
     try {
-      updateState = await nativeRequest("update");
+      [updateState, relayUpdateState] = await Promise.all([nativeRequest("update"), nativeRequest("relay-update")]);
       const labels = { unconfigured: "发布签名未配置", idle: "检查更新", checking: "正在检查更新", "up-to-date": "当前没有可用更新", available: "发现新版本", downloading: "正在下载", verifying: "正在校验", installing: "准备更新", ready: "更新已就绪", error: "操作失败，请重试" };
       find("[data-update-status]").textContent = (labels[updateState.state] || updateState.state) + (updateState.next ? " · " + updateState.next : "");
+      const relayLabels={idle:"等待检查",checking:"正在检查更新","up-to-date":"已是最新配置",available:"有中继配置更新",error:"检查失败",unavailable:"暂不可用"};
+      find("[data-relay-update-status]").textContent=(relayLabels[relayUpdateState.state] || relayUpdateState.state)+" · v"+(relayUpdateState.version || 0)+(relayUpdateState.error ? " · "+relayUpdateState.error : "");
+      find("[data-relay-update-action]").textContent=relayUpdateState.state==="available" ? "更新中继配置" : "检查更新";
+      find("[data-relay-update-action]").disabled=["checking","unavailable"].includes(relayUpdateState.state);
+      find("[data-update-badge]").hidden=!["available","ready"].includes(updateState.state) && relayUpdateState.state!=="available";
       const button = find("[data-update-action]");
       button.disabled = !updateState.configured || ["checking", "downloading", "verifying", "installing"].includes(updateState.state);
       button.setAttribute("aria-label", updateState.state === "ready" ? "重启并更新" : updateState.state === "available" ? "下载更新" : "检查更新");
@@ -1357,8 +1393,6 @@
     await refreshNetwork();
     if (!networkFormLoaded && networkState) {
       find("[data-relay-mode]").value = networkState.config.relayMode;
-      find("[data-relay-urls]").value = (networkState.config.relayURLs || []).join("\n");
-      find("[data-discovery-url]").value = networkState.config.discoveryURL || "";
       networkFormLoaded = true;
       updateNetworkFields(false);
     }
@@ -1474,31 +1508,18 @@
   });
   function updateNetworkFields(animate = true) {
     const mode = find("[data-relay-mode]").value;
-    find("[data-relay-urls]").disabled = mode !== "custom";
-    find("[data-discovery-url]").disabled = mode === "disabled";
-    reveal(find("[data-custom-relay-fields]"), mode === "custom", animate);
-    reveal(find("[data-discovery-options]"), mode !== "disabled", animate);
-    find("[data-network-mode-label]").textContent = { default: "公共中继", custom: "自定义中继", disabled: "仅直连" }[mode];
-    find("[data-network-mode-help]").textContent = {
-      default: "默认使用公共中继与地址发现。",
-      custom: "使用自建中继；地址发现可单独配置。",
-      disabled: "仅使用邀请地址与局域网发现。"
-    }[mode];
-    updateDiscoveryLabel();
-  }
-  function updateDiscoveryLabel() {
-    find("[data-discovery-mode-label]").textContent = find("[data-discovery-url]").value.trim() ? "已自定义" : "默认";
+    find("[data-network-mode-label]").textContent = { default: "公共中继", disabled: "仅直连" }[mode];
+    find("[data-network-mode-help]").textContent = mode === "disabled" ? "仅使用邀请地址与局域网发现。" : "使用 Linkport 维护的公共中继与协同发现。";
   }
   find("[data-relay-mode]").addEventListener("change", () => updateNetworkFields());
-  find("[data-discovery-url]").addEventListener("input", updateDiscoveryLabel);
   find("[data-network-save]").addEventListener("click", async event => {
     if (!nativeDesktop) return;
     const button = event.currentTarget; button.disabled = true;
     try {
       await nativeRequest("network", "PUT", {
         relayMode: find("[data-relay-mode]").value,
-        relayURLs: find("[data-relay-mode]").value === "custom" ? find("[data-relay-urls]").value.split(/[\s,]+/).filter(Boolean) : [],
-        discoveryURL: find("[data-relay-mode]").value === "disabled" ? "" : find("[data-discovery-url]").value.trim()
+        relayURLs: []
+
       });
       deviceMessage("设置已保存，网络连接已暂停。请重启 Linkport。", button);
       await refreshNetwork();
@@ -1525,6 +1546,12 @@
     try { await nativeRequest("update/" + operation, "POST"); refreshUpdate(); }
     catch { find("[data-update-status]").textContent = "操作失败，请重试"; }
   });
+  find("[data-update-badge]").addEventListener("click",openSettings);
+  find("[data-relay-update-action]").addEventListener("click",async()=>{
+    if(!nativeDesktop)return;
+    try {await nativeRequest("relay-update/"+(relayUpdateState.state==="available"?"apply":"check"),"POST");await refreshUpdate();}
+    catch {find("[data-relay-update-status]").textContent="操作失败，请重试";}
+  });
   const languageObserver = new MutationObserver(applyLanguage);
   languageObserver.observe(root, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["aria-label", "placeholder"] });
   applyPreferences();
@@ -1536,6 +1563,7 @@
     }).catch(() => { find("[data-preference-status]").textContent = "保存失败"; });
     refreshNetwork();
     setInterval(refreshNetwork, 15000);
+    refreshUpdate();setInterval(refreshUpdate,15000);
   }
   if (globalThis.Tweak) {
     const tweaks = { spacing: 20 };

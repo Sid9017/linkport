@@ -30,6 +30,7 @@ async function initializePage(page) {
   await page.route("**/wails/runtime.js", route => route.fulfill({
     contentType: "application/javascript", body: runtime,
   }));
+  await page.route("**/native/v1/relay-update", route=>route.fulfill({contentType:"application/json",body:'{"state":"up-to-date","version":1}'}));
   await page.route("**/native/v1/update", route => route.fulfill({
     contentType: "application/json", body: '{"configured":false,"state":"unconfigured"}',
   }));
@@ -548,6 +549,12 @@ async function checkDeviceManagement(page, browserName) {
     }
     await route.fulfill({ contentType: "application/json", body: JSON.stringify(network) });
   });
+  let relayUpdate={state:"available",version:1,next:2};
+  await page.route("**/native/v1/relay-update",route=>route.fulfill({contentType:"application/json",body:JSON.stringify(relayUpdate)}));
+  await page.route("**/native/v1/relay-update/apply",route=>{
+    assert.equal(route.request().headers()["x-linkport-token"],"browser-test-only");
+    relayUpdate={state:"up-to-date",version:2};return route.fulfill({status:202,body:""});
+  });
   await page.route("**/native/v1/devices/invite", route => route.fulfill({
     contentType: "application/json",
     body: JSON.stringify({ code: "linkport1.test-invitation", expiresAt: new Date(Date.now() + 300000).toISOString() }),
@@ -583,6 +590,12 @@ async function checkDeviceManagement(page, browserName) {
     await route.fulfill({ contentType: "application/json", body: JSON.stringify(network) });
   });
   await page.goto(origin, { waitUntil: "networkidle" });
+  await page.locator("[data-update-badge]").waitFor({state:"visible"});
+  await page.locator("[data-update-badge]").click();
+  await page.locator("[data-relay-update-action]").click();
+  await page.locator("[data-update-badge]").waitFor({state:"hidden"});
+  await page.locator("[data-settings-close]").click();
+
   await page.locator("[data-device-manager-open]").first().click();
   await checkCloseFrame(page, "[data-devices-close]");
   await page.waitForFunction(() => document.querySelector("[data-device-id]").textContent.length === 64);
@@ -658,29 +671,14 @@ async function checkDeviceManagement(page, browserName) {
   assert.equal(removed, true);
   await page.locator("[data-network-toggle]").click();
   await settleMotion(page);
-  assert.equal(await page.locator("[data-custom-relay-fields]").isVisible(), false);
-  assert.equal(await page.locator("[data-discovery-options]").isVisible(), false);
+  assert.equal(await page.locator("[data-relay-urls]").count(),0);
+  assert.equal(await page.locator("[data-discovery-url]").count(),0);
+  assert.equal(await page.locator("[data-hosted-relay-save]").count(),0);
+  assert.equal(await page.locator('[data-relay-mode] option[value="custom"]').count(),0);
   await page.locator("[data-relay-mode]").selectOption("default");
   await settleMotion(page);
-  assert.equal(await page.locator("[data-custom-relay-fields]").isVisible(), false);
-  assert.equal(await page.locator("[data-discovery-options]").isVisible(), true);
-  assert.equal(await page.locator("[data-discovery-url]").isVisible(), false);
-  await page.locator("[data-relay-mode]").selectOption("custom");
-  await settleMotion(page);
-  assert.equal(await page.locator("[data-custom-relay-fields]").isVisible(), true);
-  await page.locator("[data-relay-urls]").fill("https://relay.example.test");
-  await page.locator("[data-discovery-toggle]").click();
-  await page.locator("[data-discovery-url]").fill("https://discovery.example.test");
-  await settleMotion(page);
-  await page.screenshot({ path: path.join(output, `${browserName}-devices-custom.png`) });
-  await page.locator("[data-relay-mode]").selectOption("disabled");
-  await settleMotion(page);
-  assert.equal(await page.locator("[data-custom-relay-fields]").isVisible(), false);
-  assert.equal(await page.locator("[data-discovery-options]").isVisible(), false);
-  await page.locator("[data-relay-mode]").selectOption("custom");
-  await settleMotion(page);
-  assert.equal(await page.locator("[data-relay-urls]").inputValue(), "https://relay.example.test");
-  assert.equal(await page.locator("[data-discovery-url]").inputValue(), "https://discovery.example.test");
+  assert.equal(await page.locator("[data-network-mode-label]").innerText(),"公共中继");
+  await page.screenshot({path:path.join(output,`${browserName}-devices-managed.png`)});
   await page.locator("[data-relay-mode]").selectOption("disabled");
   await settleMotion(page);
   await page.locator("[data-network-save]").click();
@@ -730,9 +728,8 @@ async function checkDeviceManagement(page, browserName) {
   await page.locator("[data-settings-close]").click();
   await page.locator("[data-device-manager-open]").first().click();
   await page.locator("[data-network-toggle]").click();
-  await page.locator("[data-relay-mode]").selectOption("custom");
-  await page.locator("[data-discovery-toggle]").click();
-  assert.equal(await page.locator("[data-network-mode-label]").innerText(), "Custom relays");
+  await page.locator("[data-relay-mode]").selectOption("default");
+  assert.equal(await page.locator("[data-network-mode-label]").innerText(), "Public relays");
   await page.screenshot({ path: path.join(output, `${browserName}-devices-english.png`) });
   assert.deepEqual(errors, []);
 }

@@ -107,7 +107,7 @@ sequenceDiagram
         Local->>Peer: 按已知地址尝试连接
         opt 缓存尝试失败且请求未超时
             Local->>Lookup: 按稳定公钥重新查询联系方式
-            Lookup-->>Local: LAN 或所选公共/自定义发现结果
+            Lookup-->>Local: LAN、已配对协同发现或固定公共发现结果
         end
         opt 启用中继且连接尝试需要它
             Local->>Relay: 联络对端、交换连接所需信息
@@ -349,7 +349,7 @@ sequenceDiagram
         User->>Site: 阅读介绍、原理和文档
         Site-->>User: 版本说明与真实下载入口
     end
-    opt 已配置发布公钥且用户启用更新
+    opt 已配置发布公钥
         Host->>Release: 查询版本及匹配平台的安装包
         Release-->>Host: 安装包、SHA-256 和签名
         Host->>Host: 校验并暂存
@@ -360,7 +360,7 @@ sequenceDiagram
     Note over Site,Release: 不处理设备配对、串口权限或会话数据
 ```
 
-官网尚未上线。没有内嵌发布公钥的开发包不会自动安装更新。下载包的签名密钥和 iroh
+官网尚未上线。开发构建已内嵌发布公钥；维护者已授权并完成 GitHub Actions 发布签名密钥配置。下载包的签名密钥和 iroh
 设备身份密钥属于两套独立信任关系，不能混用或把设备密钥交给官网。
 
 ## 12. API 边界索引
@@ -392,3 +392,10 @@ sequenceDiagram
 
 `serve --local-api` 是单独的 loopback 只读开发接口，不等于上述真实 iroh 共享服务。
 它不提供设备管理或真实远端串口数据通道。
+
+## 13. 维护者中继目录更新
+
+桌面启动三十秒后和每六小时查询固定 HTTPS 目录地址。验证维护者 Ed25519 签名、有效期和单调版本；
+拒绝降版本和同版本不同内容。用户关闭自动更新时显示可用配置并允许手动应用，开启时自动应用。
+更新先插入新候选、原子持久化，再移除过时候选；不重建 endpoint，失败时保留原配置。
+模式为仅直连时只缓存目录，不启动中继连接。所有 `/native/v1/relay-update` 与 `check/apply` 操作仍要求本次启动 token。

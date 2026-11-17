@@ -6,7 +6,6 @@ import (
 	"net/url"
 
 	"github.com/tmc/go-iroh/netaddr"
-	"github.com/tmc/go-iroh/relay"
 )
 
 func validateNetwork(cfg NetworkConfig) error {
@@ -41,20 +40,4 @@ func validateNetwork(cfg NetworkConfig) error {
 		}
 	}
 	return nil
-}
-
-func relayMode(cfg NetworkConfig) relay.Mode {
-	switch cfg.RelayMode {
-	case "disabled":
-		return relay.ModeDisabled()
-	case "custom":
-		var urls []netaddr.RelayURL
-		for _, raw := range cfg.RelayURLs {
-			u, _ := netaddr.ParseRelayURL(raw)
-			urls = append(urls, u)
-		}
-		return relay.ModeCustomURLs(urls...)
-	default:
-		return relay.ModeDefault()
-	}
 }

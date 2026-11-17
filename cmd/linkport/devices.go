@@ -9,7 +9,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/Sid9017/linkport/internal/engine"
 	"github.com/Sid9017/linkport/internal/p2p"
@@ -21,9 +20,7 @@ func runDevices(ctx context.Context, args []string, output, errorOutput io.Write
 	directory := flags.String("directory", "", "Linkport device configuration directory")
 	reset := flags.Bool("reset", false, "replace this device identity and clear its trusted devices")
 	confirm := flags.String("confirm", "", "full current device ID, required for identity reset")
-	mode := flags.String("relay-mode", "", "default, custom or disabled")
-	urls := flags.String("relay-urls", "", "comma-separated custom HTTPS relay URLs")
-	discovery := flags.String("discovery-url", "", "custom HTTPS pkarr address-discovery service")
+	mode := flags.String("relay-mode", "", "default or disabled")
 	if err := flags.Parse(args[1:]); err != nil {
 		return err
 	}
@@ -65,14 +62,8 @@ func runDevices(ctx context.Context, args []string, output, errorOutput io.Write
 		return live.RemoveDevice(flags.Arg(0))
 	case "network":
 		if *mode != "" {
-			var relays []string
-			if *urls != "" {
-				for _, raw := range strings.Split(*urls, ",") {
-					relays = append(relays, strings.TrimSpace(raw))
-				}
-			}
 			if err := network.SaveConfig(p2p.NetworkConfig{
-				RelayMode: *mode, RelayURLs: relays, DiscoveryURL: *discovery,
+				RelayMode: *mode, RelayURLs: []string{},
 			}); err != nil {
 				return err
 			}

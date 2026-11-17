@@ -22,7 +22,7 @@ func TestDeviceManagementRequiresNativeTokenAndNeverExposesSeed(t *testing.T) {
 	api := &nativeAPI{engine: live, token: "local-device-management-token"}
 	handler := api.handler()
 	for _, endpoint := range []string{
-		"/network", "/devices", "/devices/invite", "/identity/reset",
+		"/network", "/devices", "/devices/invite", "/identity/reset", "/relay", "/relay-update", "/relay-update/check", "/relay-update/apply",
 	} {
 		request := httptest.NewRequest(http.MethodPost, "/native/v1"+endpoint, strings.NewReader("{}"))
 		request.Header.Set("X-Linkport-Token", "forged")
@@ -54,6 +54,34 @@ func TestDeviceManagementRequiresNativeTokenAndNeverExposesSeed(t *testing.T) {
 		}
 		if confirmation != "wrong" && (response.Code != http.StatusOK || live.Network().Status().NodeID == confirmation) {
 			t.Fatal("confirmed identity reset failed")
+		}
+	}
+}
+
+func TestEmbeddedRelayManagementUsesNativeToken(t *testing.T) {
+	live, err := engine.New(context.Background(), engine.Options{Directory: t.TempDir(), DeviceDirectory: t.TempDir(), LocalOnly: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer live.Close()
+	api := &nativeAPI{engine: live, token: "host-relay-token"}
+	handler := api.handler()
+	for _, token := range []string{"wrong", api.token} {
+		req := httptest.NewRequest(http.MethodPut, "/native/v1/relay", strings.NewReader(`{"enabled":true,"listen":"127.0.0.1:0","maxConnections":16}`))
+		req.Header.Set("X-Linkport-Token", token)
+		result := httptest.NewRecorder()
+		handler.ServeHTTP(result, req)
+		if token != api.token {
+			if result.Code != http.StatusForbidden {
+				t.Fatal("relay management bypassed native token")
+			}
+			continue
+		}
+		if result.Code != http.StatusOK || !live.Network().Status().HostedRelay.Running {
+			t.Fatalf("embedded relay did not start: %d %s", result.Code, result.Body.String())
+		}
+		if strings.Contains(result.Body.String(), `"seed"`) {
+			t.Fatal("relay status exposed device key")
 		}
 	}
 }

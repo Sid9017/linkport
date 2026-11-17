@@ -10,6 +10,7 @@ import (
 
 	"github.com/Sid9017/linkport/internal/engine"
 	"github.com/Sid9017/linkport/internal/p2p"
+	"github.com/Sid9017/linkport/internal/relayservice"
 	"github.com/Sid9017/linkport/internal/vport"
 )
 
@@ -18,6 +19,7 @@ type nativeAPI struct {
 	token                string
 	preferences          *preferenceStore
 	updates              *updateController
+	relayUpdates         *relayUpdateController
 	engine               *engine.Engine
 	onPreferencesChanged func(preferences)
 	exportLog            func(string) (string, error)
@@ -180,11 +182,28 @@ func (api *nativeAPI) handler() http.Handler {
 	})
 	for _, pattern := range []string{
 		"GET /native/v1/network", "GET /native/v1/devices",
+		"GET /native/v1/relay", "PUT /native/v1/relay",
 		"POST /native/v1/devices/invite", "POST /native/v1/devices",
 		"DELETE /native/v1/devices", "PUT /native/v1/network",
 		"POST /native/v1/identity/reset",
 	} {
 		mux.HandleFunc(pattern, api.manageDevices)
+	}
+	mux.HandleFunc("GET /native/v1/relay-update", func(w http.ResponseWriter, r *http.Request) { nativeJSON(w, api.relayUpdates.snapshot()) })
+	for _, action := range []string{"check", "apply"} {
+		mux.HandleFunc("POST /native/v1/relay-update/"+action, func(w http.ResponseWriter, r *http.Request) {
+			var err error
+			if action == "check" {
+				err = api.relayUpdates.check()
+			} else {
+				err = api.relayUpdates.apply()
+			}
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusConflict)
+				return
+			}
+			w.WriteHeader(http.StatusAccepted)
+		})
 	}
 	mux.HandleFunc("GET /native/v1/update", func(writer http.ResponseWriter, request *http.Request) {
 		nativeJSON(writer, api.updates.snapshot())
@@ -227,6 +246,15 @@ func (api *nativeAPI) manageDevices(writer http.ResponseWriter, request *http.Re
 	var result any
 	var err error
 	switch request.Method + " " + request.URL.Path {
+	case "GET /native/v1/relay":
+		result = network.Status()
+	case "PUT /native/v1/relay":
+		var cfg relayservice.HostConfig
+		if !decodeNative(writer, request, &cfg) {
+			return
+		}
+		err = network.ConfigureHostedRelay(cfg)
+		result = network.Status()
 	case "GET /native/v1/network":
 		result = network.Status()
 	case "GET /native/v1/devices":

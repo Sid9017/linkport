@@ -18,7 +18,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/updater/providers/github"
 )
 
-var updatePublicKey string
+var updatePublicKey = "hRHv6nvu8IA0lGNwJUnXCCgQG+QUeVpI+PVcs3+aHW4="
 var updateRepository = "Sid9017/linkport"
 
 type updateStatus struct {
@@ -171,9 +171,7 @@ func (controller *updateController) start() {
 			case <-controller.ctx.Done():
 				return
 			case <-timer.C:
-				if controller.settings.get().AutoUpdate {
-					_ = controller.runJob(false)
-				}
+				_ = controller.runJob(false)
 				timer.Reset(6 * time.Hour)
 			}
 		}

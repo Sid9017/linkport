@@ -88,7 +88,7 @@ Usage:
   linkport invite [--directory DIR]
   linkport pair [--directory DIR] INVITATION
   linkport forget [--directory DIR] DEVICE_ID
-  linkport network [--directory DIR] [--relay-mode default|custom|disabled]
+  linkport network [--directory DIR] [--relay-mode default|disabled]
                    [--relay-urls URL,URL] [--discovery-url URL]
 
 All ports start unshared. watch emits shared-port snapshots as JSON.

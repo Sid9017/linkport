@@ -108,6 +108,8 @@ func main() {
 		log.Fatal(err)
 	}
 	api.updates.start()
+	api.relayUpdates = newRelayUpdateController(ctx, live.Network(), settings)
+	api.relayUpdates.start()
 	navigate := func(screen string) {
 		showWindow()
 		window.ExecJS(fmt.Sprintf("document.querySelector('[data-nav=\"%s\"]')?.click()", screen))

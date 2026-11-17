@@ -16,11 +16,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Sid9017/linkport/internal/relayservice"
 	"github.com/tmc/go-iroh/endpointticket"
 	"github.com/tmc/go-iroh/iroh"
 	"github.com/tmc/go-iroh/netaddr"
 	"github.com/tmc/go-iroh/relay"
-	"github.com/tmc/go-iroh/relayserver"
 )
 
 func testNetwork(t *testing.T) *Network {
@@ -340,13 +340,44 @@ func TestNetworkSettingsValidationAndPersistence(t *testing.T) {
 }
 
 func TestPairingAndDataWorkWithRelayOnly(t *testing.T) {
-	relayHandler := relayserver.New()
-	server := httptest.NewServer(relayHandler)
-	defer server.Close()
-	url, err := netaddr.ParseRelayURL(server.URL)
+	relayHandler, err := relayservice.New(relayservice.DefaultConfig())
 	if err != nil {
 		t.Fatal(err)
 	}
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	relayCtx, stopRelay := context.WithCancel(context.Background())
+	relayDone := make(chan error, 1)
+	go func() { relayDone <- relayHandler.Serve(relayCtx, listener) }()
+	t.Cleanup(func() {
+		stopRelay()
+		select {
+		case err := <-relayDone:
+			if err != nil {
+				t.Error(err)
+			}
+		case <-time.After(12 * time.Second):
+			t.Error("relay shutdown timed out")
+		}
+		if relayHandler.Connections() != 0 {
+			t.Error("relay retained connections")
+		}
+	})
+	url, err := netaddr.ParseRelayURL("http://" + listener.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
+	runRelayPairingScenario(t, url)
+	if relayHandler.Snapshot()["datagrams_forwarded"] == 0 {
+		t.Fatal("no relay datagrams forwarded")
+	}
+}
+
+// runRelayPairingScenario is shared by handler and standalone-process tests.
+func runRelayPairingScenario(t *testing.T, url netaddr.RelayURL) {
+	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	create := func() *Network {
@@ -361,7 +392,18 @@ func TestPairingAndDataWorkWithRelayOnly(t *testing.T) {
 		}
 		t.Cleanup(n.Close)
 		go n.Serve(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			_, _ = io.WriteString(w, "encrypted relay round trip")
+			if r.URL.Path == "/hold" {
+				_, _ = w.Write([]byte("open\n"))
+				_ = http.NewResponseController(w).Flush()
+				<-r.Context().Done()
+				return
+			}
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+			_, _ = w.Write(body)
 		}))
 		if err := n.endpoint.Online(ctx); err != nil {
 			t.Fatal(err)
@@ -373,20 +415,80 @@ func TestPairingAndDataWorkWithRelayOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// An active invitation permits pairing, not inventory or serial access.
+	b.mu.Lock()
+	b.pairing[a.self().ID] = &pairingState{pending: 1}
+	b.mu.Unlock()
+	address, err := endpointticket.Decode(a.self().Ticket)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unpaired := b.NewClient(a.self().ID, 5*time.Second)
+	unpaired.Transport.(*http.Transport).DialContext = func(ctx context.Context, _, _ string) (net.Conn, error) { return b.dial(ctx, address) }
+	for _, path := range []string{"/v1/ports", "/v1/connect", "/v1/discovery"} {
+		response, err := unpaired.Get("http://" + a.self().ID + path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		response.Body.Close()
+		if response.StatusCode != http.StatusForbidden {
+			t.Fatalf("unpaired access to %s: %d", path, response.StatusCode)
+		}
+	}
+	unpaired.CloseIdleConnections()
+	b.mu.Lock()
+	delete(b.pairing, a.self().ID)
+	b.mu.Unlock()
 	peer, err := b.AddDevice(ctx, invite.Code)
 	if err != nil {
 		t.Fatal(err)
 	}
+	if _, err := b.AddDevice(ctx, invite.Code); err == nil {
+		t.Fatal("single-use invitation replayed over relay")
+	}
 	client := b.NewClient(peer.ID, 5*time.Second)
 	defer client.CloseIdleConnections()
-	response, err := client.Get("http://" + peer.ID + "/v1/info")
+	payload := bytes.Repeat([]byte{0, 1, 0x8e, 0xff, 0x0d, 0x0a}, 32768)
+	roundTrip := func(client *http.Client, id string) {
+		t.Helper()
+		response, err := client.Post("http://"+id+"/v1/info", "application/octet-stream", bytes.NewReader(payload))
+		if err != nil {
+			t.Fatal(err)
+		}
+		body, err := io.ReadAll(response.Body)
+		response.Body.Close()
+		if err != nil || !bytes.Equal(body, payload) {
+			t.Fatalf("binary relay round trip: len=%d err=%v", len(body), err)
+		}
+	}
+	roundTrip(client, peer.ID)
+	reverse := a.NewClient(b.Status().NodeID, 5*time.Second)
+	defer reverse.CloseIdleConnections()
+	roundTrip(reverse, b.Status().NodeID)
+	held, err := client.Get("http://" + peer.ID + "/hold")
 	if err != nil {
 		t.Fatal(err)
 	}
-	body, _ := io.ReadAll(response.Body)
-	response.Body.Close()
-	if string(body) != "encrypted relay round trip" || relayHandler.Snapshot()["datagrams_forwarded"] == 0 {
-		t.Fatalf("did not transfer over relay: %s", body)
+	defer held.Body.Close()
+	roundTrip(client, peer.ID)
+	held.Body.Close()
+	roundTrip(client, peer.ID)
+	active, err := client.Get("http://" + peer.ID + "/hold")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer active.Body.Close()
+	if err := a.RemoveDevice(b.Status().NodeID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := io.ReadAll(active.Body); err == nil {
+		t.Fatal("revocation left stream usable")
+	}
+	if resp, err := client.Get("http://" + peer.ID + "/v1/ports"); err == nil {
+		resp.Body.Close()
+		if resp.StatusCode == http.StatusOK {
+			t.Fatal("revoked peer regained access")
+		}
 	}
 }
 

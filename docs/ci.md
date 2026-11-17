@@ -74,6 +74,17 @@ round trips, parameter forwarding, reopening, independent mappings, blocked
 operation cancellation, local monitoring and physical-port ownership.
 They do not require USB hardware, an account or a public relay. The iroh suite uses real encrypted loopback endpoints to verify pairing, invitation expiry/replay, peer revocation and stream cancellation. The engine suite carries binary data through iroh and real PTYs, with physical modem outputs omitted for the simulated UART.
 
+The root suite also builds and starts a standalone `linkport-relay` subprocess
+for isolated integration tests. Two loopback iroh endpoints use relay-only
+transport to verify pairing authorization, invitation replay rejection, binary
+round trips, stream isolation and revocation. Process checks cover HTTP routes,
+connection-limit recovery, slow request headers and unsafe plaintext binding.
+Unix additionally verifies SIGTERM while authenticated endpoints and a QUIC stream
+are live; Windows skips that signal-specific case and forcibly cleans up the
+other test subprocesses. This adds no runner job. See [relay.md](relay.md) for
+the standalone command and the distinction between endpoint race checks and the
+ordinary child-process build.
+
 ## Frontend coverage
 
 The checked-in browser suite is `scripts/ui/check.cjs`, with a pinned Playwright
@@ -163,3 +174,26 @@ References:
 
 - [Playwright CI setup](https://playwright.dev/docs/ci)
 - [com0com source and driver installation requirements](https://github.com/datamancer/com0com/blob/master/com0com/ReadMe.txt)
+
+## Desktop discovery and relay recovery
+
+The root suite additionally checks signed contact exchange among paired devices,
+three-device lookup after an endpoint changes address, persisted cache validation,
+expiry/rollback/revocation, and embedded relay start/stop/restart. A two-relay
+loopback test disables direct IP transports, actually shuts down the primary relay,
+and verifies binary requests recover on the alternate without endpoint rebind.
+This proves recovery of requests, not uninterrupted physical serial sessions.
+The native API and browser fixtures exercise the opt-in desktop relay controls.
+These tests stay in the existing jobs and do not change the routine CI profile.
+
+### Managed relay directory and explicit public acceptance
+
+Normal tests do not contact the deployed public relay. `TestManagedCatalogPersistenceAndPolicy`
+checks migration without replacing identity, signed version persistence, rollback/conflict/expiry
+rejection, peer relay filtering, direct-only preservation, and cache write failure. Desktop tests
+check manual versus automatic directory application, redirects, offline preservation, and native
+token protection. Chromium fixtures check the update badge and that custom relay controls are absent.
+
+The operator can explicitly run `TestPublicRelayDeployment` by setting
+`LINKPORT_TEST_PUBLIC_RELAY=https://207.148.110.58`. Use temporary identities and no serial hardware;
+see [the deployment report](relay-deployment.md) for the actual November 17 results and network limits.

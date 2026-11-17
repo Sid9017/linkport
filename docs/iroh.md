@@ -52,7 +52,7 @@ Unix 上该文件权限为 `0600`，目录新建权限为 `0700`；Windows 使�
 
 ## 连接与网络服务
 
-默认模式使用 n0 公共中继和公共 pkarr/DNS 地址发现，同时使用局域网 mDNS。
+默认模式使用 Linkport 维护者签名目录中的中继和公共 pkarr/DNS 地址发现，同时使用局域网 mDNS。
 公开地址记录只包含中继地址，不发布串口、日志、信任名单或私有 LAN 地址。
 配对邀请可以包含直接地址；只应通过可信渠道分享。
 
@@ -69,17 +69,16 @@ Unix 上该文件权限为 `0600`，目录新建权限为 `0700`；Windows 使�
 
 | 模式 | 行为 |
 | --- | --- |
-| 公共中继 | 公共中继与公共地址发现；也可以配置自己的 pkarr 服务 |
-| 自定义中继 | 1–8 个 HTTPS 中继；地址发现留空时只使用邀请地址和局域网发现 |
+| 公共中继 | 维护者签名目录中的 HTTPS 中继、配对协同发现与公共地址发现 |
 | 仅直连 | 不连接公共中继、不访问公共地址发现，使用直接地址与局域网发现 |
 
 网络设置保存后立即关闭旧端点和发现服务，重启 Linkport 后应用。本机串口
 监听继续工作。跨互联网的仅直连模式取决于地址可达性，不能保证穿过所有 NAT。
-自定义服务必须使用 HTTPS；仅 loopback 测试地址允许 HTTP。
+用户不能填写自定义中继或发现服务地址；旧配置在启动时迁移，保留身份和配对。
 
-中继转发密文，能够观察连接与流量元数据，不能读取串口内容。公共服务不是
-项目自行部署或承诺可用性的服务。自建中继和地址发现的部署留到独立工作，
-本次迁移不创建云机器，也不改动其他 VPS。
+中继转发密文，能够观察连接与流量元数据，不能读取串口内容。
+项目已部署东京 `https://207.148.110.58`；公网验证范围见 [部署记录](relay-deployment.md)。
+公共中继目录使用独立签名密钥，不从配对设备公告自动添加任意中继。
 
 ## 无桌面的机器
 
@@ -103,9 +102,7 @@ go run ./cmd/linkport serve
 ```sh
 go run ./cmd/linkport forget DEVICE_ID
 go run ./cmd/linkport network --relay-mode disabled
-go run ./cmd/linkport network --relay-mode custom \
-  --relay-urls https://relay.example.com \
-  --discovery-url https://discovery.example.com/pkarr
+go run ./cmd/linkport network --relay-mode default
 go run ./cmd/linkport identity --reset --confirm FULL_CURRENT_DEVICE_ID
 ```
 
@@ -121,3 +118,13 @@ CI 保留 Windows/Linux/macOS 原生构建与测试。
 
 仍需在目标环境验证真实跨网络 NAT、公共和自建中继、不同版本 Rust iroh
 互通、实际 USB 串口及 Windows com0com 驱动。交叉编译不能代替这些运行验证。
+
+## Desktop 协同发现与维护者中继
+
+设备通过已配对通道交换签名联系方式并缓存；旧地址失败时可以向其他已配对设备查询。
+公共中继由维护者签名目录提供，普通用户界面不提供自定义中继或本机公网监听设置。
+同源中继模块仍可以被维护者程序嵌入或独立运行。多中继恢复的边界见 [中继与协同发现](relay.md)。
+
+应用版本与中继配置都有更新提示。后台自动更新开启时，应用包校验后暂存、等待重启；
+中继目录验证签名、有效期和版本后在线应用。关闭自动更新仍可检查并手动操作。
+失败检查保留已安装的签名目录，缓存较新目录不会重新启用仅直连模式。
