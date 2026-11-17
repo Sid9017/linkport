@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,6 +35,10 @@ func openConfigFile(path string) (*os.File, error) {
 // when its readers permit delete sharing. POSIX rename semantics keep those
 // readers on the old file while new opens see the complete replacement.
 func replaceConfigFile(oldPath, newPath string) error {
+	return replaceConfigFileWithInfo(oldPath, newPath, windows.SetFileInformationByHandle)
+}
+
+func replaceConfigFileWithInfo(oldPath, newPath string, setInfo func(windows.Handle, uint32, *byte, uint32) error) error {
 	fail := func(err error) error {
 		return &os.LinkError{Op: "rename", Old: oldPath, New: newPath, Err: err}
 	}
@@ -59,8 +64,6 @@ func replaceConfigFile(oldPath, newPath string) error {
 	if err != nil {
 		return fail(err)
 	}
-	defer windows.CloseHandle(handle)
-
 	// FILE_RENAME_INFO has pointer-sized padding before RootDirectory. Use the
 	// native layout rather than hard-coding an amd64/arm64 byte offset.
 	type renameInfo struct {
@@ -75,8 +78,12 @@ func replaceConfigFile(oldPath, newPath string) error {
 	info.Flags = windows.FILE_RENAME_REPLACE_IF_EXISTS | windows.FILE_RENAME_POSIX_SEMANTICS
 	info.FileNameLength = uint32((len(targetUTF16) - 1) * 2)
 	copy(unsafe.Slice(&info.FileName[0], len(targetUTF16)), targetUTF16)
-	if err := windows.SetFileInformationByHandle(handle, windows.FileRenameInfoEx,
-		&buffer[0], uint32(len(buffer))); err != nil {
+	err = setInfo(handle, windows.FileRenameInfoEx, &buffer[0], uint32(len(buffer)))
+	windows.CloseHandle(handle)
+	if errors.Is(err, windows.ERROR_INVALID_PARAMETER) || errors.Is(err, windows.ERROR_NOT_SUPPORTED) {
+		err = windows.MoveFileEx(sourceUTF16, &targetUTF16[0], windows.MOVEFILE_REPLACE_EXISTING)
+	}
+	if err != nil {
 		return fail(err)
 	}
 	return nil
