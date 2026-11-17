@@ -9,6 +9,37 @@ const stepPanels = [...document.querySelectorAll(".step-panel")];
 const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)");
 let currentStep = 0;
 
+const sceneStage = document.querySelector(".scene-stage");
+const serialObject = document.querySelector(".serial-object");
+const sceneWires = document.querySelector(".scene-wires");
+const cableAnchor = document.querySelector(".terminal-cable-anchor");
+
+function drawSceneCable() {
+  const transform = serialObject.getScreenCTM();
+  if (!transform) return;
+  const origin = serialObject.createSVGPoint();
+  origin.x = 150;
+  origin.y = 78;
+  const start = origin.matrixTransform(transform);
+  const stage = sceneStage.getBoundingClientRect();
+  const target = cableAnchor.getBoundingClientRect();
+  const startX = start.x - stage.left;
+  const startY = start.y - stage.top;
+  const endX = target.left - stage.left;
+  const endY = target.top - stage.top;
+  const bend = Math.max(24, (endX - startX) * .55);
+  const path = `M${startX} ${startY}C${startX + bend} ${startY} ${endX - bend} ${endY} ${endX} ${endY}`;
+  sceneWires.setAttribute("viewBox", `0 0 ${stage.width} ${stage.height}`);
+  sceneWires.querySelectorAll("path").forEach(wire => wire.setAttribute("d", path));
+  sceneWires.querySelector("animateMotion").setAttribute("path", path);
+}
+
+const sceneObserver = new ResizeObserver(drawSceneCable);
+sceneObserver.observe(sceneStage);
+sceneObserver.observe(document.querySelector(".local-terminal"));
+document.fonts.ready.then(drawSceneCable);
+drawSceneCable();
+
 function setStep(nextStep, focusTab = false) {
   currentStep = nextStep;
   stepTabs.forEach((tab, index) => {
@@ -104,6 +135,7 @@ if (window.gsap && window.ScrollTrigger) {
       });
     });
     const cable = gsap.timeline({
+      onUpdate: drawSceneCable,
       scrollTrigger: { trigger: ".connection-scene", start: "top 96%", end: "bottom 30%", scrub: .5 },
     });
     cable.from(".hardware", { x: 35, scale: .85, transformOrigin: "center center", ease: "none" }, 0);

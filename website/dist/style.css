@@ -94,6 +94,7 @@ img { max-width: 100%; }
 .hardware code { margin-top: 2px; color: var(--muted); font-size: 11px; }
 .hardware-badge { margin-top: 9px; padding: 1px 9px; border: 1px solid #cdcdcd; border-radius: 4px; font-size: 10px; line-height: 1.8; color: #595959; background: #efefef; }
 .local-terminal { position: absolute; top: 35px; right: 0; width: 49%; border: 1px solid #303030; border-radius: 9px; background: #272727; color: #fafafa; overflow: hidden; transform: rotate(-2deg); }
+.terminal-cable-anchor { position: absolute; left: 0; top: 72%; width: 0; height: 0; pointer-events: none; }
 .terminal-top { display: flex; align-items: center; gap: 7px; min-height: 37px; padding: 8px 12px; border-bottom: 1px solid #484848; font-size: 11px; }
 .terminal-top .icon { width: 13px; height: 13px; }
 .terminal-baud { margin-left: auto; color: #c0c0c0; font-size: 10px; }
@@ -144,7 +145,7 @@ h2 { font-size: clamp(28px, 2.8vw, 36px); line-height: 1.35; letter-spacing: -.0
 .pair-link { display: flex; align-items: center; gap: 6px; padding-top: 8px; }
 .pair-line { height: 1px; min-width: 6px; flex: 1; background: #b7b7b7; }
 .invite-key { display: flex; flex-direction: column; align-items: center; gap: 5px; color: #616161; font-size: 10px; white-space: nowrap; }
-.invite-key .icon { width: 22px; height: 22px; }
+.invite-key .icon { width: 28px; height: 28px; }
 .panel-caption { display: flex; grid-column: 1 / -1; align-items: center; justify-content: center; gap: 6px; margin-top: 16px; font-size: 11px; color: var(--muted); }
 .panel-caption .icon { width: 13px; height: 13px; }
 .sharing-panel { padding: 15px 20px 12px; }
