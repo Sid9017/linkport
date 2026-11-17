@@ -27,7 +27,7 @@
 #linkport-review [hidden] { display: none !important; }
 #linkport-review button, #linkport-review input, #linkport-review select { font: inherit; color: inherit; }
 #linkport-review button, #linkport-review select { cursor: default; }
-#linkport-review button:focus-visible, #linkport-review input:focus-visible, #linkport-review select:focus-visible { outline: 2px solid var(--lp-accent); outline-offset: 3px; }
+#linkport-review button:focus-visible, #linkport-review input:focus-visible, #linkport-review textarea:focus-visible, #linkport-review select:focus-visible { outline: 2px solid var(--lp-accent); outline-offset: 3px; }
 #linkport-review button { background: var(--lp-bg); border: 1px solid var(--lp-line); padding: 6px 11px; border-radius: 6px; white-space: nowrap; transition: background-color 140ms, border-color 140ms; }
 #linkport-review button:hover { background: var(--lp-soft); border-color: var(--lp-strong); }
 #linkport-review button:active:not(:disabled) { background: var(--lp-tint); }
@@ -47,9 +47,10 @@
 #linkport-review select { max-width: 100%; background: var(--lp-bg); border: 1px solid var(--lp-line); border-radius: 6px; padding: 4px 6px; }
 #linkport-review .lp-netstate { color: var(--lp-secondary); font-size: calc(12px * var(--lp-font-scale)); display: flex; gap: 6px; align-items: center; }
 #linkport-review .lp-layout { display: grid; grid-template-columns: 148px minmax(0, 1fr); position: relative; min-height: 0; flex: 1; overflow: hidden; }
-#linkport-review .lp-sidebar { padding: 16px 10px; border-right: 1px solid var(--lp-line); background: var(--lp-soft); }
-#linkport-review .lp-sidebar button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 36px; padding: 8px 12px; margin-bottom: 6px; border: 0; text-align: left; color: var(--lp-muted); background: transparent; font-weight: 500; }
-#linkport-review .lp-sidebar button[aria-current="page"] { background: var(--lp-bg); color: var(--lp-text); }
+#linkport-review .lp-sidebar { position: relative; padding: 16px 10px; border-right: 1px solid var(--lp-line); background: var(--lp-soft); }
+#linkport-review .lp-nav-indicator { position: absolute; left: 10px; right: 10px; top: 16px; height: 36px; border-radius: 6px; background: var(--lp-bg); pointer-events: none; transition: top 200ms cubic-bezier(.2,.8,.2,1), height 200ms cubic-bezier(.2,.8,.2,1); }
+#linkport-review .lp-sidebar button { position: relative; display: flex; align-items: center; gap: 10px; width: 100%; min-height: 36px; padding: 8px 12px; margin-bottom: 6px; border: 0; text-align: left; color: var(--lp-muted); background: transparent; font-weight: 500; }
+#linkport-review .lp-sidebar button[aria-current="page"] { background: transparent; color: var(--lp-text); }
 #linkport-review .lp-sidebar button[aria-current="page"] svg { color: var(--lp-accent-text); }
 #linkport-review .lp-panels { min-width: 0; min-height: 0; overflow: hidden; }
 #linkport-review .lp-connections { position: absolute; inset: 0; pointer-events: none; z-index: 2; width: 100%; height: 100%; overflow: visible; }
@@ -177,6 +178,7 @@
 #linkport-review .lp-settings::backdrop { background: rgb(0 0 0 / .16); }
 #linkport-review .lp-settings-head { display: flex; align-items: center; justify-content: space-between; min-height: 54px; padding: 10px 20px; border-bottom: 1px solid var(--lp-line); flex: none; }
 #linkport-review .lp-settings-head h2 { font-size: calc(15px * var(--lp-font-scale)); }
+#linkport-review .lp-settings-head .lp-iconbutton::after { display: none; }
 #linkport-review .lp-settings-body { padding: 0 20px; min-height: 0; overflow-y: auto; scrollbar-width: thin; }
 #linkport-review .lp-setting { display: flex; align-items: center; justify-content: space-between; gap: 20px; min-height: 42px; padding: 6px 0; }
 #linkport-review .lp-setting > span { min-width: 0; }
@@ -188,7 +190,7 @@
 #linkport-review [data-preference-status] { padding: 0; }
 #linkport-review [data-preference-status]:empty { display: none; }
 #linkport-review .lp-setting button:not(.lp-iconbutton) { padding: 4px 10px; min-height: 30px; }
-#linkport-review .lp-live-toast { position: fixed; right: 20px; bottom: 20px; max-width: min(480px, calc(100% - 40px)); padding: 9px 13px; border: 1px solid var(--lp-line); border-radius: 6px; background: var(--lp-text); color: var(--lp-bg); z-index: 30; font-size: calc(12px * var(--lp-font-scale)); overflow-wrap: anywhere; }
+#linkport-review .lp-live-toast { position: fixed; right: 20px; bottom: 20px; max-width: min(480px, calc(100% - 40px)); padding: 9px 13px; border: 1px solid var(--lp-line); border-radius: 6px; background: var(--lp-text); color: var(--lp-bg); z-index: 30; font-size: calc(12px * var(--lp-font-scale)); overflow-wrap: anywhere; pointer-events: none; }
 #linkport-review .lp-connect-form { padding: 12px 20px 20px; overflow: auto; }
 #linkport-review .lp-connect-form input { width: 150px; min-height: 30px; border: 1px solid var(--lp-line); border-radius: 6px; background: var(--lp-bg); padding: 4px 8px; }
 #linkport-review .lp-connect-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
@@ -197,7 +199,7 @@
 #linkport-review .lp-switch::after { content: ""; position: absolute; width: 13px; height: 13px; left: 2px; top: 2px; border-radius: 50%; background: var(--lp-bg); transition: transform 140ms; }
 #linkport-review .lp-switch:checked { background: var(--lp-text); }
 #linkport-review .lp-switch:checked::after { transform: translateX(11px); }
-@keyframes lp-dialog-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes lp-dialog-in { from { opacity: 0; transform: translateY(7px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @media (max-width: 900px) {
   #linkport-review .lp-layout { grid-template-columns: calc(112px * var(--lp-font-scale)) minmax(0,1fr); }
   #linkport-review .lp-topology { grid-template-columns: 124px minmax(0,1fr); gap: 32px; }
@@ -253,17 +255,45 @@
   #linkport-review button, #linkport-review select, #linkport-review .lp-checkbox, #linkport-review .lp-sharelabel { min-height: 44px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  #linkport-review button, #linkport-review .lp-switch, #linkport-review .lp-switch::after { transition: none; }
+  #linkport-review button, #linkport-review .lp-switch, #linkport-review .lp-switch::after, #linkport-review .lp-nav-indicator, #linkport-review .lp-disclosure .lp-icon { transition: none; }
   #linkport-review .lp-settings[open] { animation: none; }
 }
 
-#linkport-review .lp-device-field { display: grid; gap: 8px; margin: 12px 0; }
-#linkport-review .lp-device-field textarea, #linkport-review .lp-device-field input { width: 100%; min-width: 0; padding: 8px; border: 1px solid var(--lp-line); border-radius: 5px; background: var(--lp-bg); color: var(--lp-text); font: inherit; resize: vertical; }
-#linkport-review [data-device-id] { display: block; overflow-wrap: anywhere; user-select: text; }
+#linkport-review .lp-device-field { display: grid; gap: 7px; margin: 10px 0; }
+#linkport-review .lp-device-field textarea, #linkport-review .lp-device-field input { width: 100%; min-width: 0; padding: 9px 10px; border: 1px solid var(--lp-line); border-radius: 6px; background: var(--lp-bg); color: var(--lp-text); font: inherit; resize: none; }
+#linkport-review .lp-device-field textarea { min-height: 62px; line-height: 1.6; }
+#linkport-review [data-devices-dialog] { width: 520px; }
+#linkport-review [data-devices-dialog] .lp-settings-body { padding: 0 22px 10px; }
+#linkport-review [data-devices-dialog] .lp-settings-section { padding: 15px 0; }
+#linkport-review .lp-device-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 30px; }
+#linkport-review .lp-device-heading > span:first-child { font-weight: 500; }
+#linkport-review .lp-device-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-top: 10px; }
+#linkport-review .lp-disclosure { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 34px; padding: 4px 0; border: 0; background: transparent; text-align: left; white-space: normal; }
+#linkport-review .lp-disclosure:hover { background: transparent; }
+#linkport-review .lp-disclosure > .lp-icon { width: 15px; height: 15px; margin-left: auto; color: var(--lp-muted); transition: transform 180ms; }
+#linkport-review .lp-disclosure[aria-expanded="true"] > .lp-icon { transform: rotate(90deg); }
+#linkport-review .lp-disclosure-note { margin-left: auto; color: var(--lp-muted); font-size: calc(12px * var(--lp-font-scale)); }
+#linkport-review .lp-disclosure-note + .lp-icon { margin-left: 0; }
+#linkport-review .lp-disclosure-animating { overflow: hidden; }
+#linkport-review .lp-reveal-content { padding-top: 9px; }
+#linkport-review .lp-identity-row { display: flex; align-items: center; gap: 9px; }
+#linkport-review .lp-identity-row .lp-disclosure { flex: 1; min-width: 0; }
+#linkport-review .lp-identity-row .lp-disclosure > span { font-size: calc(12px * var(--lp-font-scale)); color: var(--lp-muted); white-space: nowrap; }
+#linkport-review [data-device-id-short] { margin-left: auto; color: light-dark(#757575, #aaa); font: calc(12px * var(--lp-font-scale))/1.5 var(--lp-mono); white-space: nowrap; }
+#linkport-review .lp-identity-row .lp-disclosure > .lp-icon { margin-left: 0; }
+#linkport-review [data-device-id] { display: block; padding: 10px 12px; background: var(--lp-soft); border-radius: 6px; color: var(--lp-muted); font: calc(12px * var(--lp-font-scale))/1.7 var(--lp-mono); overflow-wrap: anywhere; user-select: text; }
+#linkport-review .lp-invitation-row { display: flex; align-items: center; gap: 8px; margin: 10px 0 8px; }
+#linkport-review .lp-invitation-row input { min-width: 0; flex: 1; border: 1px solid var(--lp-line); border-radius: 6px; background: var(--lp-soft); color: var(--lp-muted); padding: 8px 10px; font: calc(12px * var(--lp-font-scale))/1.5 var(--lp-mono); text-overflow: ellipsis; }
+#linkport-review [data-paired-devices] .lp-setting-info { min-width: 0; }
+#linkport-review [data-paired-devices] .lp-setting-info > span { overflow-wrap: anywhere; }
+#linkport-review [data-paired-devices] code { color: var(--lp-muted); font: calc(11px * var(--lp-font-scale))/1.5 var(--lp-mono); }
+#linkport-review [data-device-message]:empty, #linkport-review [data-invitation-expiry]:empty { display: none; }
+#linkport-review [data-device-message] { padding: 0 0 12px; }
+#linkport-review [data-paired-count] { font: calc(11px * var(--lp-font-scale))/1.5 var(--lp-mono); color: var(--lp-muted); }
 #linkport-review [data-devices-dialog] .lp-inline { flex-wrap: wrap; }
-#linkport-review [data-devices-dialog] details { padding: 12px 0; }
-#linkport-review [data-devices-dialog] summary { cursor: pointer; }
 #linkport-review [data-devices-dialog] .lp-settings-status { overflow-wrap: anywhere; }
+#linkport-review [data-devices-dialog] .lp-settings-status + .lp-device-field { margin-top: 12px; }
+#linkport-review [data-discovery-toggle] { min-height: 36px; font-size: calc(12px * var(--lp-font-scale)); color: var(--lp-muted); }
 </style>
 <div id="linkport-review">
   <svg class="lp-symbols" aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><defs>
@@ -286,6 +316,8 @@
     <symbol id="lp-icon-settings" viewBox="0 0 24 24"><path d="m10 3-.6 3-2.2 1.3-2.8-1L2.4 10l2.2 2v2l-2.2 2 2 3.7 2.8-1L9.4 20l.6 3h4l.6-3 2.2-1.3 2.8 1 2-3.7-2.2-2v-2l2.2-2-2-3.7-2.8 1L14.6 6 14 3z" transform="translate(0 -1) scale(1 .94)"/><circle cx="12" cy="12" r="3"/></symbol>
     <symbol id="lp-icon-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
     <symbol id="lp-icon-arrow" viewBox="0 0 24 24"><path d="M4 12h16m-5-5 5 5-5 5"/></symbol>
+    <symbol id="lp-icon-chevron" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+    <symbol id="lp-icon-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V4a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h4"/></symbol>
   </defs></svg>
   <div class="lp-window" aria-label="Linkport 桌面设计预览，所有数据均为演示">
     <header class="lp-titlebar">
@@ -294,7 +326,8 @@
     </header>
     <main class="lp-layout">
       <nav class="lp-sidebar" aria-label="主导航">
-        <button type="button" data-nav="connect" aria-current="page"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-link"/></svg><span>连接</span></button>
+        <span class="lp-nav-indicator" aria-hidden="true"></span>
+        <button type="button" data-nav="connect" aria-current="page"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-machine"/></svg><span>设备</span></button>
         <button type="button" data-nav="share"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-share"/></svg><span>共享</span></button>
         <button type="button" data-nav="monitor"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-listen"/></svg><span>监听</span></button>
         <button type="button" data-nav="plugins"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-plugin"/></svg><span>插件</span></button>
@@ -414,27 +447,45 @@
   <dialog class="lp-settings" data-devices-dialog aria-labelledby="lp-devices-title">
     <div class="lp-settings-head"><h2 id="lp-devices-title">设备与配对</h2><button type="button" class="lp-iconbutton" data-devices-close aria-label="关闭设备管理"><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-close"/></svg></button></div>
     <div class="lp-settings-body">
-      <div class="lp-settings-section"><span>本机设备 ID</span><code data-device-id>—</code><p class="lp-settings-status">身份密钥仅保存在本机。请通过邀请添加其他设备，无需账号。</p></div>
       <div class="lp-settings-section">
-        <div class="lp-inline"><button type="button" class="lp-primary" data-invite-create>生成配对邀请</button><button type="button" data-invite-copy>复制邀请</button></div>
-        <label class="lp-device-field"><span>本机邀请</span><textarea rows="3" readonly data-invitation aria-label="本机配对邀请"></textarea></label>
-        <p class="lp-settings-status" data-invitation-expiry></p>
-        <label class="lp-device-field"><span>另一台设备的邀请</span><textarea rows="3" data-pair-code aria-label="另一台设备的配对邀请" placeholder="粘贴另一台机器生成的 linkport1. 邀请"></textarea></label>
-        <button type="button" class="lp-primary" data-pair-add>添加设备</button>
-        <p class="lp-settings-status" data-device-message role="status"></p>
+        <div class="lp-identity-row"><button type="button" class="lp-disclosure" data-disclosure data-device-id-toggle aria-expanded="false" aria-controls="lp-device-identity"><span>本机设备 ID</span><code data-device-id-short>—</code><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-chevron"/></svg></button><button type="button" class="lp-iconbutton" data-device-id-copy aria-label="复制设备 ID" disabled><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-copy"/></svg></button></div>
+        <div id="lp-device-identity" class="lp-reveal-content" hidden><code data-device-id>—</code></div>
       </div>
-      <div class="lp-settings-section"><span>已配对设备</span><div data-paired-devices></div></div>
-      <details><summary>网络与密钥</summary>
-        <label class="lp-device-field"><span>中继模式</span><select data-relay-mode aria-label="中继模式"><option value="default">公共中继</option><option value="custom">自定义中继</option><option value="disabled">仅直连</option></select></label>
-        <label class="lp-device-field"><span>自定义中继地址</span><textarea rows="2" data-relay-urls aria-label="自定义中继地址" placeholder="每行一个 HTTPS 地址"></textarea></label>
-        <label class="lp-device-field"><span>自定义地址发现服务</span><input data-discovery-url aria-label="自定义地址发现服务" placeholder="可选的 HTTPS pkarr 服务地址"></label>
-        <p class="lp-settings-status">仅直连模式不访问公共中继或公共地址发现。自定义模式留空地址发现时使用邀请中的地址和局域网发现。</p>
-        <button type="button" data-network-save>保存并暂停网络</button>
-        <p class="lp-settings-status">保存后需重启 Linkport。网络切换会断开远端会话，本机监听继续运行。</p>
-        <label class="lp-device-field"><span>重置本机身份</span><input data-reset-confirmation aria-label="重置身份确认" placeholder="输入完整本机设备 ID 确认"></label>
-        <p class="lp-settings-status">重置会生成新密钥、清除配对并断开远端会话。其他机器需移除旧设备并重新配对；本机重置不能撤销它们对旧密钥的信任。</p>
-        <button type="button" data-identity-reset>重置本机身份</button>
-      </details>
+      <div class="lp-settings-section">
+        <div class="lp-device-heading"><span>邀请设备</span><button type="button" class="lp-primary" data-invite-create autofocus>生成配对邀请</button></div>
+        <div class="lp-reveal-content" data-invitation-panel hidden>
+          <div class="lp-invitation-row"><input type="text" readonly data-invitation aria-label="本机配对邀请"><button type="button" class="lp-iconbutton" data-invite-copy aria-label="复制邀请" disabled><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-copy"/></svg></button></div>
+          <p class="lp-settings-status" data-invitation-expiry></p>
+        </div>
+      </div>
+      <div class="lp-settings-section">
+        <label class="lp-device-field"><span>导入邀请</span><textarea rows="2" data-pair-code aria-label="另一台设备的配对邀请" placeholder="粘贴另一台设备的邀请"></textarea></label>
+        <div class="lp-device-actions"><button type="button" class="lp-primary" data-pair-add disabled>添加设备</button></div>
+      </div>
+      <div class="lp-settings-section"><div class="lp-device-heading"><span>已配对设备</span><span data-paired-count>0</span></div><div data-paired-devices></div></div>
+      <div class="lp-settings-section">
+        <button type="button" class="lp-disclosure" data-disclosure data-network-toggle aria-expanded="false" aria-controls="lp-network-options"><span>网络设置</span><span class="lp-disclosure-note" data-network-mode-label>公共中继</span><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-chevron"/></svg></button>
+        <div id="lp-network-options" class="lp-reveal-content" hidden>
+          <label class="lp-setting"><span>中继模式</span><select data-relay-mode aria-label="中继模式"><option value="default">公共中继</option><option value="custom">自定义中继</option><option value="disabled">仅直连</option></select></label>
+          <div data-custom-relay-fields hidden><label class="lp-device-field"><span>自定义中继地址</span><textarea rows="2" data-relay-urls aria-label="自定义中继地址" placeholder="每行一个 HTTPS 地址"></textarea></label></div>
+          <div data-discovery-options>
+            <button type="button" class="lp-disclosure" data-disclosure data-discovery-toggle aria-expanded="false" aria-controls="lp-discovery-fields"><span>地址发现</span><span class="lp-disclosure-note" data-discovery-mode-label>默认</span><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-chevron"/></svg></button>
+            <div id="lp-discovery-fields" class="lp-reveal-content" hidden><label class="lp-device-field"><span>自定义地址发现服务</span><input data-discovery-url aria-label="自定义地址发现服务" placeholder="可选的 HTTPS pkarr 服务地址"></label><p class="lp-settings-status">留空使用当前模式的默认发现方式。</p></div>
+          </div>
+          <p class="lp-settings-status" data-network-mode-help>默认使用公共中继与地址发现。</p>
+          <div class="lp-device-actions"><button type="button" data-network-save>保存并暂停网络</button></div>
+          <p class="lp-settings-status">重启后生效。远端会话将断开，本机监听继续运行。</p>
+        </div>
+      </div>
+      <div class="lp-settings-section">
+        <button type="button" class="lp-disclosure" data-disclosure data-identity-toggle aria-expanded="false" aria-controls="lp-identity-options"><span>身份管理</span><svg class="lp-icon" aria-hidden="true"><use href="#lp-icon-chevron"/></svg></button>
+        <div id="lp-identity-options" class="lp-reveal-content" hidden>
+          <p class="lp-settings-status">重置会清除本机配对并断开会话。其他设备上的旧授权需分别移除。</p>
+          <label class="lp-device-field"><span>重置本机身份</span><input data-reset-confirmation aria-label="重置身份确认" placeholder="输入完整本机设备 ID 确认"></label>
+          <div class="lp-device-actions"><button type="button" data-identity-reset disabled>重置本机身份</button></div>
+        </div>
+      </div>
+      <p class="lp-settings-status" data-device-message role="status"></p>
     </div>
   </dialog>
   <dialog class="lp-settings" data-connect-dialog aria-labelledby="lp-connect-title">
@@ -461,6 +512,118 @@
   const nativeDesktop = document.querySelector('meta[name="linkport-desktop"]')?.content === "true";
   const nativeToken = document.querySelector('meta[name="linkport-api-token"]')?.content || "";
   let drawCurves = () => {};
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  const revealAnimations = new WeakMap();
+  const entryAnimations = new WeakMap();
+  const closingDialogs = new WeakMap();
+  function enter(node, distance = 5) {
+    entryAnimations.get(node)?.cancel();
+    if (reducedMotion.matches || node.hidden) return;
+    entryAnimations.set(node, node.animate([
+      { opacity: .3, transform: `translateY(${distance}px)` },
+      { opacity: 1, transform: "translateY(0)" }
+    ], { duration: 200, easing: "cubic-bezier(.2,.8,.2,1)" }));
+  }
+  function reveal(node, visible, animate = true, onLayout = () => {}) {
+    const pending = revealAnimations.get(node);
+    if (!pending && node.hidden === !visible) return;
+    const before = node.hidden ? 0 : node.getBoundingClientRect().height;
+    const opacity = node.hidden ? 0 : Number(getComputedStyle(node).opacity);
+    const padding = node.hidden ? "0px" : getComputedStyle(node).paddingTop;
+    pending?.cancel();
+    revealAnimations.delete(node);
+    node.classList.remove("lp-disclosure-animating");
+    node.hidden = false;
+    node.inert = !visible;
+    const height = node.getBoundingClientRect().height;
+    const targetPadding = getComputedStyle(node).paddingTop;
+    if (!animate || reducedMotion.matches || !node.getClientRects().length) {
+      node.hidden = !visible;
+      onLayout();
+      return;
+    }
+    node.classList.add("lp-disclosure-animating");
+    const animation = node.animate([
+      { height: before + "px", paddingTop: padding, opacity },
+      { height: (visible ? height : 0) + "px", paddingTop: visible ? targetPadding : "0px", opacity: visible ? 1 : 0 }
+    ], { duration: visible ? 220 : 150, easing: "cubic-bezier(.2,.8,.2,1)", fill: "both" });
+    revealAnimations.set(node, animation);
+    animation.onfinish = () => {
+      if (revealAnimations.get(node) !== animation) return;
+      node.hidden = !visible;
+      node.classList.remove("lp-disclosure-animating");
+      revealAnimations.delete(node);
+      animation.cancel();
+      onLayout();
+    };
+    const frame = () => {
+      if (revealAnimations.get(node) !== animation) return;
+      onLayout();
+      requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  }
+  function disclosure(button, expanded, animate = true) {
+    button.setAttribute("aria-expanded", String(expanded));
+    reveal(find("#" + button.getAttribute("aria-controls")), expanded, animate);
+  }
+  for (const button of all("[data-disclosure]")) button.addEventListener("click", () => {
+    disclosure(button, button.getAttribute("aria-expanded") !== "true");
+  });
+  function openDialog(dialog) {
+    closingDialogs.get(dialog)?.cancel();
+    closingDialogs.delete(dialog);
+    if (!dialog.open) dialog.showModal();
+  }
+  function closeDialog(dialog) {
+    if (!dialog.open || closingDialogs.has(dialog)) return;
+    if (reducedMotion.matches) { dialog.close(); return; }
+    const animation = dialog.animate([
+      { opacity: 1, transform: "translateY(0) scale(1)" },
+      { opacity: 0, transform: "translateY(4px) scale(.99)" }
+    ], { duration: 110, easing: "ease-in", fill: "forwards" });
+    closingDialogs.set(dialog, animation);
+    animation.onfinish = () => {
+      closingDialogs.delete(dialog);
+      dialog.close();
+      animation.cancel();
+    };
+  }
+  for (const dialog of all("dialog")) dialog.addEventListener("cancel", event => {
+    event.preventDefault();
+    closeDialog(dialog);
+  });
+  const indicator = find(".lp-nav-indicator");
+  function positionIndicator(animate = true) {
+    const selected = find('[data-nav][aria-current="page"]');
+    if (!animate) indicator.style.transition = "none";
+    indicator.style.top = selected.offsetTop + "px";
+    indicator.style.height = selected.offsetHeight + "px";
+    if (!animate) {
+      indicator.getBoundingClientRect();
+      indicator.style.removeProperty("transition");
+    }
+  }
+  function showScreen(name) {
+    const previous = find('[data-nav][aria-current="page"]')?.dataset.nav;
+    for (const screen of all("[data-screen]")) screen.hidden = screen.dataset.screen !== name;
+    for (const button of all("[data-nav]")) {
+      if (button.dataset.nav === name) button.setAttribute("aria-current", "page");
+      else button.removeAttribute("aria-current");
+    }
+    positionIndicator();
+    if (previous !== name) enter(find(`[data-screen="${name}"]`));
+    drawCurves();
+  }
+  for (const button of all("[data-nav]")) button.addEventListener("click", () => showScreen(button.dataset.nav));
+  const navigationObserver = new ResizeObserver(() => positionIndicator(false));
+  navigationObserver.observe(find(".lp-sidebar"));
+  for (const button of all("[data-nav]")) navigationObserver.observe(button);
+  document.fonts.ready.then(() => positionIndicator(false));
+  positionIndicator(false);
+  enter(find(".lp-panels"), 7);
+  window.addEventListener("pagehide", () => navigationObserver.disconnect(), { once: true });
+  const motion = { enter, reveal, openDialog, closeDialog };
   if (!nativeDesktop) {
   for (const template of all("template[data-demo-shares], template[data-demo-devices]")) template.replaceWith(template.content.cloneNode(true));
   find("[data-host-name]").textContent = "dev-machine";
@@ -739,15 +902,6 @@
     drawConnection();
     drawLogs();
   });
-  function showScreen(name) {
-    for (const screen of all("[data-screen]")) screen.hidden = screen.dataset.screen !== name;
-    for (const button of all("[data-nav]")) {
-      if (button.dataset.nav === name) button.setAttribute("aria-current", "page");
-      else button.removeAttribute("aria-current");
-    }
-    drawCurves();
-  }
-  for (const button of all("[data-nav]")) button.addEventListener("click", () => showScreen(button.dataset.nav));
   find("[data-filter]").addEventListener("input", drawLogs);
   find("[data-format]").addEventListener("change", drawLogs);
   find(".lp-send").addEventListener("submit", event => {
@@ -857,6 +1011,23 @@
     return response.status === 202 || response.status === 204 ? null : response.json();
   }
   const translations = {
+    "复制设备 ID": "Copy device ID",
+    "设备 ID 已复制": "Device ID copied",
+    "请复制选中的设备 ID": "Copy the selected device ID",
+    "邀请设备": "Invite device",
+    "导入邀请": "Import invitation",
+    "粘贴另一台设备的邀请": "Paste an invitation from another device",
+    "网络设置": "Network settings",
+    "地址发现": "Address discovery",
+    "默认": "Default",
+    "已自定义": "Custom",
+    "留空使用当前模式的默认发现方式。": "Leave empty to use this mode’s default discovery.",
+    "默认使用公共中继与地址发现。": "Uses public relays and address discovery.",
+    "使用自建中继；地址发现可单独配置。": "Uses your relays; discovery can be configured separately.",
+    "仅使用邀请地址与局域网发现。": "Uses invitation addresses and LAN discovery only.",
+    "重启后生效。远端会话将断开，本机监听继续运行。": "Restart to apply. Remote sessions disconnect; local monitoring continues.",
+    "身份管理": "Identity management",
+    "重置会清除本机配对并断开会话。其他设备上的旧授权需分别移除。": "Reset clears local pairings and disconnects sessions. Remove the old authorization on your other devices separately.",
     "身份密钥仅保存在本机。请通过邀请添加其他设备，无需账号。": "Identity keys stay on this device. Add devices with invitations; no account is needed.",
     "本机配对邀请": "Pairing invitation from this device",
     "另一台设备的配对邀请": "Pairing invitation from another device",
@@ -992,6 +1163,7 @@
     "浅色": "Light",
     "深色": "Dark",
     "连接": "Connect",
+    "设备": "Device",
     "断开": "Disconnect",
     "共享": "Share",
     "监听": "Monitor",
@@ -1053,6 +1225,7 @@
       else input.value = String(value);
     }
     applyLanguage();
+    positionIndicator(false);
     drawCurves();
   }
   for (const input of all("[data-preference]")) input.addEventListener("change", () => {
@@ -1073,7 +1246,10 @@
     try {
       networkState = await nativeRequest("network");
       find("[data-network-status]").textContent = networkState.restartRequired ? "请重启 Linkport 使配置生效" : networkState.state === "Running" ? "设备身份已就绪，无需登录" : "网络未运行";
-      find("[data-device-id]").textContent = networkState.nodeID;
+      const identity = networkState.nodeID || "";
+      find("[data-device-id]").textContent = identity || "—";
+      find("[data-device-id-short]").textContent = identity ? identity.slice(0, 10) + "…" + identity.slice(-6) : "—";
+      find("[data-device-id-copy]").disabled = !identity;
     } catch { find("[data-network-status]").textContent = "无法读取设备状态"; }
   }
   async function refreshUpdate() {
@@ -1088,19 +1264,25 @@
     } catch { find("[data-update-status]").textContent = "操作失败，请重试"; }
   }
   function openSettings() {
-    if (!settingsDialog.open) settingsDialog.showModal();
+    openDialog(settingsDialog);
     refreshNetwork();
     refreshUpdate();
     if (nativeDesktop && !settingsPoll) settingsPoll = setInterval(() => { refreshNetwork(); refreshUpdate(); }, 3000);
   }
   find("[data-settings-open]").addEventListener("click", openSettings);
-  find("[data-settings-close]").addEventListener("click", () => settingsDialog.close());
+  find("[data-settings-close]").addEventListener("click", () => closeDialog(settingsDialog));
   settingsDialog.addEventListener("close", () => { clearInterval(settingsPoll); settingsPoll = null; });
   const devicesDialog = find("[data-devices-dialog]");
   let devicesPoll = null;
   let devicesSignature = "";
   let networkFormLoaded = false;
-  const deviceMessage = message => { find("[data-device-message]").textContent = message; };
+  let devicesGeneration = 0;
+  const deviceMessage = message => {
+    const node = find("[data-device-message]");
+    if (node.textContent === message) return;
+    node.textContent = message;
+    if (message) enter(node, 3);
+  };
   async function refreshDevices() {
     if (!nativeDesktop) { deviceMessage("在桌面版中管理真实设备"); return; }
     await refreshNetwork();
@@ -1109,13 +1291,15 @@
       find("[data-relay-urls]").value = (networkState.config.relayURLs || []).join("\n");
       find("[data-discovery-url]").value = networkState.config.discoveryURL || "";
       networkFormLoaded = true;
-      updateNetworkFields();
+      updateNetworkFields(false);
     }
     const peers = await nativeRequest("devices");
     const signature = JSON.stringify(peers);
     if (signature === devicesSignature) return;
     devicesSignature = signature;
+    find("[data-paired-count]").textContent = String(peers.length);
     const list = find("[data-paired-devices]");
+    const previousPeers = new Set([...list.querySelectorAll("[data-device-remove]")].map(button => button.dataset.deviceRemove));
     list.replaceChildren();
     if (!peers.length) {
       const empty = document.createElement("p");
@@ -1137,32 +1321,60 @@
         catch (error) { deviceMessage(error.message); remove.disabled = false; }
       });
       row.append(details, remove); list.append(row);
+      if (!previousPeers.has(peer.id)) enter(row, 3);
     }
   }
   function openDevices() {
     if (settingsDialog.open) settingsDialog.close();
-    if (!devicesDialog.open) devicesDialog.showModal();
+    openDialog(devicesDialog);
+    devicesGeneration++;
     networkFormLoaded = false;
     deviceMessage("");
     refreshDevices().catch(error => deviceMessage(error.message));
     if (!devicesPoll) devicesPoll = setInterval(() => refreshDevices().catch(error => deviceMessage(error.message)), 3000);
   }
   for (const button of all("[data-device-manager-open], [data-live-add]")) button.addEventListener("click", openDevices);
-  find("[data-devices-close]").addEventListener("click", () => devicesDialog.close());
+  find("[data-devices-close]").addEventListener("click", () => closeDialog(devicesDialog));
   devicesDialog.addEventListener("close", () => {
+    devicesGeneration++;
     clearInterval(devicesPoll); devicesPoll = null;
     find("[data-invitation]").value = "";
+    find("[data-invitation-expiry]").textContent = "";
+    find("[data-invite-copy]").disabled = true;
+    reveal(find("[data-invitation-panel]"), false, false);
     find("[data-pair-code]").value = "";
+    find("[data-pair-add]").disabled = true;
     find("[data-reset-confirmation]").value = "";
+    find("[data-identity-reset]").disabled = true;
+    for (const button of all("[data-devices-dialog] [data-disclosure]")) disclosure(button, false, false);
+    find("[data-devices-dialog] .lp-settings-body").scrollTop = 0;
+  });
+  find("[data-device-id-copy]").addEventListener("click", async () => {
+    const identity = networkState?.nodeID;
+    if (!identity) return;
+    try { await navigator.clipboard.writeText(identity); deviceMessage("设备 ID 已复制"); }
+    catch {
+      disclosure(find("[data-device-id-toggle]"), true, false);
+      const selection = window.getSelection();
+      const range = document.createRange();
+      range.selectNodeContents(find("[data-device-id]"));
+      selection.removeAllRanges();
+      selection.addRange(range);
+      deviceMessage("请复制选中的设备 ID");
+    }
   });
   find("[data-invite-create]").addEventListener("click", async event => {
     if (!nativeDesktop) { deviceMessage("在桌面版中生成配对邀请"); return; }
     const button = event.currentTarget; button.disabled = true;
+    const generation = devicesGeneration;
     try {
       const invite = await nativeRequest("devices/invite", "POST");
+      if (generation !== devicesGeneration || !devicesDialog.open) return;
       find("[data-invitation]").value = invite.code;
       find("[data-invitation-expiry]").textContent = "仅可使用一次，有效期 5 分钟；生成新邀请会使旧邀请失效。";
-      deviceMessage("将邀请复制到另一台机器的 Linkport。请仅发送给你信任的人。");
+      find("[data-invite-copy]").disabled = false;
+      reveal(find("[data-invitation-panel]"), true);
+      deviceMessage("");
     } catch (error) { deviceMessage(error.message); }
     finally { button.disabled = false; }
   });
@@ -1183,16 +1395,36 @@
       await refreshDevices();
       await nativeRequest("refresh", "POST");
     } catch (error) { deviceMessage(error.message); }
-    finally { button.disabled = false; }
+    finally { button.disabled = !find("[data-pair-code]").value.trim(); }
   });
-  function updateNetworkFields() {
+  find("[data-pair-code]").addEventListener("input", event => {
+    find("[data-pair-add]").disabled = !event.target.value.trim();
+  });
+  find("[data-reset-confirmation]").addEventListener("input", event => {
+    find("[data-identity-reset]").disabled = !event.target.value.trim();
+  });
+  function updateNetworkFields(animate = true) {
     const mode = find("[data-relay-mode]").value;
     find("[data-relay-urls]").disabled = mode !== "custom";
     find("[data-discovery-url]").disabled = mode === "disabled";
+    reveal(find("[data-custom-relay-fields]"), mode === "custom", animate);
+    reveal(find("[data-discovery-options]"), mode !== "disabled", animate);
+    find("[data-network-mode-label]").textContent = { default: "公共中继", custom: "自定义中继", disabled: "仅直连" }[mode];
+    find("[data-network-mode-help]").textContent = {
+      default: "默认使用公共中继与地址发现。",
+      custom: "使用自建中继；地址发现可单独配置。",
+      disabled: "仅使用邀请地址与局域网发现。"
+    }[mode];
+    updateDiscoveryLabel();
   }
-  find("[data-relay-mode]").addEventListener("change", updateNetworkFields);
-  find("[data-network-save]").addEventListener("click", async () => {
+  function updateDiscoveryLabel() {
+    find("[data-discovery-mode-label]").textContent = find("[data-discovery-url]").value.trim() ? "已自定义" : "默认";
+  }
+  find("[data-relay-mode]").addEventListener("change", () => updateNetworkFields());
+  find("[data-discovery-url]").addEventListener("input", updateDiscoveryLabel);
+  find("[data-network-save]").addEventListener("click", async event => {
     if (!nativeDesktop) return;
+    const button = event.currentTarget; button.disabled = true;
     try {
       await nativeRequest("network", "PUT", {
         relayMode: find("[data-relay-mode]").value,
@@ -1202,15 +1434,18 @@
       deviceMessage("设置已保存，网络连接已暂停。请重启 Linkport。");
       await refreshNetwork();
     } catch (error) { deviceMessage(error.message); }
+    finally { button.disabled = false; }
   });
-  find("[data-identity-reset]").addEventListener("click", async () => {
+  find("[data-identity-reset]").addEventListener("click", async event => {
     if (!nativeDesktop) return;
+    const button = event.currentTarget; button.disabled = true;
     try {
       await nativeRequest("identity/reset", "POST", { confirmation: find("[data-reset-confirmation]").value.trim() });
       deviceMessage("本机身份已重置，配对关系已清除。请重启并重新配对设备。");
       find("[data-reset-confirmation]").value = "";
       await refreshDevices();
     } catch (error) { deviceMessage(error.message); }
+    finally { button.disabled = !find("[data-reset-confirmation]").value.trim(); }
   });
   find("[data-update-action]").addEventListener("click", async () => {
     if (!nativeDesktop) {
@@ -1225,7 +1460,7 @@
   languageObserver.observe(root, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ["aria-label", "placeholder"] });
   applyPreferences();
   if (nativeDesktop) {
-    drawCurves = globalThis.initializeLinkportLive(root, nativeRequest);
+    drawCurves = globalThis.initializeLinkportLive(root, nativeRequest, motion);
     const revision = preferenceRevision;
     nativeRequest("preferences").then(saved => {
       if (preferenceRevision === revision) { preferences = saved; applyPreferences(); }

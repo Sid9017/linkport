@@ -15,6 +15,7 @@ const runtime = fs.readFileSync(path.join(wailsDirectory, "internal/assetserver/
 fs.mkdirSync(output, { recursive: true });
 
 async function initializePage(page) {
+  let preferences = { fontSize: 13, language: "zh-CN", theme: "light", closeToTray: true, autoUpdate: false };
   await page.addInitScript(({ platform }) => {
     window.nativeMessages = [];
     window._wails = { environment: { OS: platform }, flags: {} };
@@ -32,6 +33,19 @@ async function initializePage(page) {
   await page.route("**/native/v1/update", route => route.fulfill({
     contentType: "application/json", body: '{"configured":false,"state":"unconfigured"}',
   }));
+  await page.route("**/native/v1/preferences", route => {
+    if (route.request().method() === "PUT") preferences = route.request().postDataJSON();
+    return route.fulfill({ contentType: "application/json", body: JSON.stringify(preferences) });
+  });
+}
+
+async function settleMotion(page) {
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await Promise.all(document.getAnimations()
+      .filter(animation => animation.effect.getComputedTiming().iterations !== Infinity)
+      .map(animation => animation.finished.catch(() => {})));
+  });
 }
 
 async function checkFunctional(page, browserName) {
@@ -39,6 +53,7 @@ async function checkFunctional(page, browserName) {
   page.on("pageerror", error => errors.push(error.message));
   await initializePage(page);
   await page.goto(origin, { waitUntil: "networkidle" });
+  assert.equal(await page.locator("[data-nav=connect]").innerText(), "设备");
   await page.waitForFunction(() => window.nativeMessages.includes("wails:runtime:ready"));
   assert.equal(await page.locator('meta[name="linkport-host-platform"]').getAttribute("content"), platform);
   await page.mouse.move(400, 25);
@@ -177,6 +192,12 @@ async function checkFunctional(page, browserName) {
   await page.getByRole("button", { name: "导出完整会话", exact: true }).click();
   await page.waitForFunction(() => !document.querySelector("[data-live-toast]").hidden);
   assert.ok((await page.locator("[data-live-toast]").innerText()).includes("fixture.log"));
+  await settleMotion(page);
+  assert.equal(await page.evaluate(() => {
+    const toast = document.querySelector("[data-live-toast]").getBoundingClientRect();
+    const commandbar = document.querySelector(".lp-commandbar").getBoundingClientRect();
+    return toast.bottom <= commandbar.top - 8;
+  }), true, "export feedback must leave the command bar visible");
   await page.getByRole("button", { name: "暂停显示", exact: true }).click();
   await page.getByRole("button", { name: "清空日志", exact: true }).click();
   await page.waitForFunction(() => document.querySelectorAll(".lp-logline").length === 0);
@@ -197,9 +218,17 @@ async function checkFunctional(page, browserName) {
     await page.setViewportSize(viewport);
     for (const screen of ["connect", "share", "monitor", "plugins"]) {
       await page.locator(`[data-nav=${screen}]`).click();
+      await settleMotion(page);
       assert.equal(await page.evaluate(() =>
         document.documentElement.scrollHeight > document.documentElement.clientHeight ||
         document.documentElement.scrollWidth > document.documentElement.clientWidth), false);
+      const aligned = await page.evaluate(() => {
+        const active = document.querySelector('[data-nav][aria-current="page"]').getBoundingClientRect();
+        const indicator = document.querySelector(".lp-nav-indicator").getBoundingClientRect();
+        return Math.abs(active.top - indicator.top) < 1 && Math.abs(active.height - indicator.height) < 1;
+      });
+      assert.equal(aligned, true, "navigation indicator must follow the selected item");
+      await page.screenshot({ path: path.join(output, `${browserName}-${screen}-${viewport.width}.png`) });
     }
   }
   await page.locator("[data-nav=connect]").click();
@@ -254,6 +283,12 @@ async function checkDeviceManagement(page, browserName) {
   const errors = [];
   page.on("pageerror", error => errors.push(error.message));
   await initializePage(page);
+  await page.addInitScript(() => {
+    window.copiedText = "";
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true, value: { writeText: async text => { window.copiedText = text; } },
+    });
+  });
   const id = "a".repeat(64);
   const peer = { id: "b".repeat(64), hostName: "Paired test machine" };
   const network = { state: "Running", nodeID: id, config: { relayMode: "disabled", relayURLs: [] } };
@@ -308,22 +343,95 @@ async function checkDeviceManagement(page, browserName) {
   await page.locator("[data-device-manager-open]").first().click();
   await page.waitForFunction(() => document.querySelector("[data-device-id]").textContent.length === 64);
   assert.equal(await page.locator("[data-device-id]").textContent(), id);
+  assert.equal(await page.locator("[data-device-id-short]").textContent(), "aaaaaaaaaa…aaaaaa");
+  assert.equal(await page.locator("[data-device-id]").isVisible(), false);
+  assert.equal(await page.locator("[data-invitation-panel]").isVisible(), false);
+  assert.equal(await page.locator("[data-pair-add]").isDisabled(), true);
+  await settleMotion(page);
+  const compactHeight = (await page.locator("[data-devices-dialog]").boundingBox()).height;
+  await page.screenshot({ path: path.join(output, `${browserName}-devices-default.png`) });
+  const expansion = await page.locator("[data-device-id-toggle]").evaluate(button => {
+    button.click();
+    const node = document.getElementById(button.getAttribute("aria-controls"));
+    const animation = node.getAnimations()[0];
+    animation.pause();
+    animation.currentTime = 0;
+    const start = node.getBoundingClientRect().height;
+    const dialogStart = node.closest("dialog").getBoundingClientRect().height;
+    animation.currentTime = 100;
+    const middle = node.getBoundingClientRect().height;
+    const dialogMiddle = node.closest("dialog").getBoundingClientRect().height;
+    animation.currentTime = 220;
+    const end = node.getBoundingClientRect().height;
+    const dialogEnd = node.closest("dialog").getBoundingClientRect().height;
+    animation.play();
+    return { start, middle, end, dialogStart, dialogMiddle, dialogEnd };
+  });
+  assert.ok(expansion.start < expansion.middle && expansion.middle < expansion.end, JSON.stringify(expansion));
+  assert.ok(expansion.dialogStart < expansion.dialogMiddle && expansion.dialogMiddle < expansion.dialogEnd, JSON.stringify(expansion));
+  await settleMotion(page);
+  assert.equal(await page.locator("[data-device-id]").isVisible(), true);
+  await page.locator("[data-device-id-copy]").click();
+  assert.equal(await page.evaluate(() => window.copiedText), id);
+  await page.evaluate(() => {
+    const button = document.querySelector("[data-device-id-toggle]");
+    button.click(); button.click(); button.click();
+  });
+  await settleMotion(page);
+  assert.equal(await page.locator("[data-device-id]").isVisible(), false);
+  assert.equal(await page.locator("[data-device-id-toggle]").getAttribute("aria-expanded"), "false");
   await page.locator("[data-invite-create]").click();
   await page.waitForFunction(() => document.querySelector("[data-invitation]").value.startsWith("linkport1."));
+  await settleMotion(page);
   assert.equal(await page.locator("[data-invitation]").inputValue(), "linkport1.test-invitation");
+  assert.equal(await page.locator("[data-invitation-panel]").isVisible(), true);
+  assert.ok((await page.locator("[data-devices-dialog]").boundingBox()).height > compactHeight + 30);
+  await page.locator("[data-invite-copy]").click();
+  assert.equal(await page.evaluate(() => window.copiedText), "linkport1.test-invitation");
   await page.locator("[data-pair-code]").fill("expired");
   await page.locator("[data-pair-add]").click();
   await page.waitForFunction(() => document.querySelector("[data-device-message]").textContent.includes("已过期"));
   await page.locator("[data-pair-code]").fill("linkport1.from-other-device");
   await page.locator("[data-pair-add]").click();
   await page.locator("[data-device-remove]").waitFor();
+  assert.equal(await page.locator("[data-paired-count]").textContent(), "1");
   assert.equal(await page.locator("[data-pair-code]").inputValue(), "");
+  assert.equal(await page.locator("[data-pair-add]").isDisabled(), true);
   await page.locator("[data-device-remove]").click();
   await page.waitForFunction(() => document.querySelector("[data-paired-devices]").textContent.includes("尚未配对"));
   assert.equal(removed, true);
-  await page.locator("[data-devices-dialog] summary").click();
+  await page.locator("[data-network-toggle]").click();
+  await settleMotion(page);
+  assert.equal(await page.locator("[data-custom-relay-fields]").isVisible(), false);
+  assert.equal(await page.locator("[data-discovery-options]").isVisible(), false);
+  await page.locator("[data-relay-mode]").selectOption("default");
+  await settleMotion(page);
+  assert.equal(await page.locator("[data-custom-relay-fields]").isVisible(), false);
+  assert.equal(await page.locator("[data-discovery-options]").isVisible(), true);
+  assert.equal(await page.locator("[data-discovery-url]").isVisible(), false);
+  await page.locator("[data-relay-mode]").selectOption("custom");
+  await settleMotion(page);
+  assert.equal(await page.locator("[data-custom-relay-fields]").isVisible(), true);
+  await page.locator("[data-relay-urls]").fill("https://relay.example.test");
+  await page.locator("[data-discovery-toggle]").click();
+  await page.locator("[data-discovery-url]").fill("https://discovery.example.test");
+  await settleMotion(page);
+  await page.screenshot({ path: path.join(output, `${browserName}-devices-custom.png`) });
+  await page.locator("[data-relay-mode]").selectOption("disabled");
+  await settleMotion(page);
+  assert.equal(await page.locator("[data-custom-relay-fields]").isVisible(), false);
+  assert.equal(await page.locator("[data-discovery-options]").isVisible(), false);
+  await page.locator("[data-relay-mode]").selectOption("custom");
+  await settleMotion(page);
+  assert.equal(await page.locator("[data-relay-urls]").inputValue(), "https://relay.example.test");
+  assert.equal(await page.locator("[data-discovery-url]").inputValue(), "https://discovery.example.test");
+  await page.locator("[data-relay-mode]").selectOption("disabled");
+  await settleMotion(page);
   await page.locator("[data-network-save]").click();
   await page.waitForFunction(() => document.querySelector("[data-device-message]").textContent.includes("请重启"));
+  await page.locator("[data-network-toggle]").click();
+  await page.locator("[data-identity-toggle]").click();
+  assert.equal(await page.locator("[data-identity-reset]").isDisabled(), true);
   await page.locator("[data-reset-confirmation]").fill("wrong");
   await page.locator("[data-identity-reset]").click();
   await page.waitForFunction(() => document.querySelector("[data-device-message]").textContent.includes("完整"));
@@ -335,6 +443,41 @@ async function checkDeviceManagement(page, browserName) {
   await page.screenshot({ path: path.join(output, `${browserName}-devices.png`) });
   await page.locator("[data-devices-close]").click();
   await page.waitForFunction(() => document.querySelector("[data-invitation]").value === "");
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.locator("[data-device-manager-open]").first().click();
+  assert.equal(await page.locator("[data-device-id]").isVisible(), false);
+  assert.equal(await page.locator("[data-invitation-panel]").isVisible(), false);
+  assert.equal(await page.locator("#lp-network-options").isVisible(), false);
+  assert.equal(await page.locator("#lp-identity-options").isVisible(), false);
+  await page.locator("[data-network-toggle]").focus();
+  await page.keyboard.press("Enter");
+  assert.equal(await page.locator("#lp-network-options").isVisible(), true);
+  assert.equal(await page.locator("#lp-network-options").evaluate(node => node.getAnimations().length), 0);
+  await page.keyboard.press("Escape");
+  assert.equal(await page.locator("[data-devices-dialog]").isVisible(), false);
+  await page.locator("[data-settings-open]").click();
+  await page.locator('[data-preference="fontSize"]').selectOption("18");
+  await page.locator('[data-preference="theme"]').selectOption("dark");
+  await page.screenshot({ path: path.join(output, `${browserName}-settings-dark.png`) });
+  await page.locator("[data-settings-close]").click();
+  await page.setViewportSize({ width: 760, height: 540 });
+  await page.locator("[data-device-manager-open]").first().click();
+  await page.screenshot({ path: path.join(output, `${browserName}-devices-dark-large-font.png`) });
+  assert.equal(await page.evaluate(() => {
+    const bounds = document.querySelector("[data-devices-dialog]").getBoundingClientRect();
+    return bounds.top >= 0 && bounds.left >= 0 && bounds.bottom <= innerHeight && bounds.right <= innerWidth;
+  }), true);
+  await page.locator("[data-devices-close]").click();
+  await page.locator("[data-settings-open]").click();
+  await page.locator('[data-preference="language"]').selectOption("en");
+  assert.equal(await page.locator("[data-nav=connect]").innerText(), "Device");
+  await page.locator("[data-settings-close]").click();
+  await page.locator("[data-device-manager-open]").first().click();
+  await page.locator("[data-network-toggle]").click();
+  await page.locator("[data-relay-mode]").selectOption("custom");
+  await page.locator("[data-discovery-toggle]").click();
+  assert.equal(await page.locator("[data-network-mode-label]").innerText(), "Custom relays");
+  await page.screenshot({ path: path.join(output, `${browserName}-devices-english.png`) });
   assert.deepEqual(errors, []);
 }
 

@@ -1,4 +1,4 @@
-globalThis.initializeLinkportLive = (root, request) => {
+globalThis.initializeLinkportLive = (root, request, motion) => {
   const find = selector => root.querySelector(selector);
   const all = selector => [...root.querySelectorAll(selector)];
   const platform = document.querySelector('meta[name="linkport-host-platform"]')?.content;
@@ -66,8 +66,15 @@ globalThis.initializeLinkportLive = (root, request) => {
     const node = find("[data-live-toast]");
     node.textContent = message;
     node.hidden = false;
+    positionToast();
+    motion.enter(node);
     toastTimer = setTimeout(() => { node.hidden = true; }, 6000);
     find("[data-notice]").textContent = message;
+  }
+  function positionToast() {
+    const commandbar = find(".lp-commandbar");
+    const offset = commandbar.getClientRects().length ? window.innerHeight - commandbar.getBoundingClientRect().top + 12 : 20;
+    find("[data-live-toast]").style.bottom = offset + "px";
   }
   const key = (nodeID, portID) => JSON.stringify([nodeID, portID]);
   const active = () => state.sessions.filter(session => session.connected && !session.local);
@@ -79,15 +86,6 @@ globalThis.initializeLinkportLive = (root, request) => {
     const date = new Date(value);
     return date.toLocaleTimeString("en-GB", { hour12: false }) + "." + String(date.getMilliseconds()).padStart(3, "0");
   }
-  function showScreen(name) {
-    for (const screen of all("[data-screen]")) screen.hidden = screen.dataset.screen !== name;
-    for (const nav of all("[data-nav]")) {
-      if (nav.dataset.nav === name) nav.setAttribute("aria-current", "page");
-      else nav.removeAttribute("aria-current");
-    }
-    drawCurves();
-  }
-  for (const nav of all("[data-nav]")) nav.addEventListener("click", () => showScreen(nav.dataset.nav));
   function openConnection(device, port) {
     pendingTarget = { nodeID: device.id, portID: port.id };
     find("#lp-connect-title").textContent = "连接串口";
@@ -100,7 +98,7 @@ globalThis.initializeLinkportLive = (root, request) => {
     find("[data-connect-target]").textContent = device.hostName + " / " + port.path;
     find("[data-connect-error]").textContent = "";
     form.elements.baudRate.value = "115200";
-    dialog.showModal();
+    motion.openDialog(dialog);
   }
   function renderLocalPicker() {
     const signature = JSON.stringify(state.localPorts.map(port => [port.id, port.path, port.product]));
@@ -132,10 +130,10 @@ globalThis.initializeLinkportLive = (root, request) => {
     find("[data-connect-submit]").disabled = !state.localPorts.length;
     form.elements.baudRate.value = "115200";
     renderLocalPicker();
-    dialog.showModal();
+    motion.openDialog(dialog);
   }
   find("[data-local-monitor-open]").addEventListener("click", openLocalMonitor);
-  for (const cancel of all("[data-connect-cancel]")) cancel.addEventListener("click", () => dialog.close());
+  for (const cancel of all("[data-connect-cancel]")) cancel.addEventListener("click", () => motion.closeDialog(dialog));
   form.addEventListener("submit", async event => {
     event.preventDefault();
     if (!pendingTarget) return;
@@ -153,7 +151,7 @@ globalThis.initializeLinkportLive = (root, request) => {
         pairDevice: windows ? form.elements.pairDevice.value.trim() : ""
       });
       selected = session.id;
-      dialog.close();
+      motion.closeDialog(dialog);
       await refresh();
     } catch (error) {
       find("[data-connect-error]").textContent = error.message;
@@ -199,11 +197,10 @@ globalThis.initializeLinkportLive = (root, request) => {
         machine.setAttribute("aria-expanded", String(!tree.hidden));
         machine.setAttribute("aria-controls", tree.id);
         machine.addEventListener("click", () => {
-          tree.hidden = !tree.hidden;
-          expanded.set(device.id, !tree.hidden);
-          machine.setAttribute("aria-expanded", String(!tree.hidden));
-          updateTopology();
-          drawCurves();
+          const visible = !expanded.get(device.id);
+          expanded.set(device.id, visible);
+          machine.setAttribute("aria-expanded", String(visible));
+          motion.reveal(tree, visible, true, () => { updateTopology(); drawCurves(); });
         });
         for (const port of device.ports) {
           const session = matching(device.id, port.id);
@@ -239,7 +236,10 @@ globalThis.initializeLinkportLive = (root, request) => {
     drawCurves();
   }
   function updateTopology() {
-    const visiblePorts = all(".lp-portrow").filter(port => !port.closest(".lp-porttree")?.hidden).length;
+    const visiblePorts = all(".lp-portrow").filter(port => {
+      const tree = port.closest(".lp-porttree");
+      return !tree?.hidden && !tree?.inert;
+    }).length;
     find(".lp-topology").dataset.scrollable = String(state.devices.length + visiblePorts > 6);
   }
   function renderSharing() {
@@ -493,7 +493,11 @@ globalThis.initializeLinkportLive = (root, request) => {
     try { await request("refresh", "POST"); await refresh(); }
     catch (error) { toast(error.message); }
   });
-  find("[data-session-select]").addEventListener("change", event => { selected = event.target.value; renderLog(true); });
+  find("[data-session-select]").addEventListener("change", event => {
+    selected = event.target.value;
+    renderLog(true);
+    motion.enter(find("[data-session-label]"));
+  });
   find("[data-action=disconnect]").addEventListener("click", () => {
     const session = currentSession();
     if (session) disconnect(session);
@@ -537,11 +541,12 @@ globalThis.initializeLinkportLive = (root, request) => {
     } catch (error) { toast(error.message); }
     finally { find("[data-send]").disabled = !currentSession()?.connected; }
   });
-  const observer = new ResizeObserver(drawCurves);
+  const observer = new ResizeObserver(() => { drawCurves(); positionToast(); });
   find(".lp-devices").addEventListener("scroll", () => {
     if (!scrollFrame) scrollFrame = requestAnimationFrame(() => { scrollFrame = 0; drawCurves(); });
   });
   for (const node of all(".lp-topology, .lp-local, .lp-devices")) observer.observe(node);
+  observer.observe(find(".lp-commandbar"));
   document.fonts.ready.then(drawCurves);
   render();
   refresh();
