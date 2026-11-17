@@ -1,0 +1,9 @@
+{
+  "name": "linkport-ui-tests",
+  "private": true,
+  "version": "0.0.1",
+  "description": "Isolated browser checks for the native Linkport frontend",
+  "dependencies": {
+    "playwright": "1.65.1"
+  }
+}

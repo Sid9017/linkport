@@ -1,0 +1,51 @@
+name: Windows com0com driver
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  driver:
+    name: Real com0com pair
+    runs-on: [self-hosted, Windows, X64, linkport-com0com]
+    timeout-minutes: 10
+    concurrency:
+      group: com0com-driver-pair
+      cancel-in-progress: false
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      CGO_ENABLED: "0"
+      GOTOOLCHAIN: local
+      GOFLAGS: -mod=readonly
+      LINKPORT_TEST_COM0COM_REQUIRED: "1"
+      LINKPORT_TEST_COM0COM_PATH: ${{ vars.LINKPORT_TEST_COM0COM_PATH }}
+      LINKPORT_TEST_COM0COM_PAIR: ${{ vars.LINKPORT_TEST_COM0COM_PAIR }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Require reserved driver ports
+        run: |
+          if (-not $env:LINKPORT_TEST_COM0COM_PATH -or -not $env:LINKPORT_TEST_COM0COM_PAIR) {
+            throw "Configure both LINKPORT_TEST_COM0COM_PATH and LINKPORT_TEST_COM0COM_PAIR repository variables."
+          }
+      - name: Test actual com0com driver
+        run: |
+          New-Item -ItemType Directory -Force dist/ci | Out-Null
+          go test -tags com0com_integration -json -count=1 -timeout=2m -run '^TestCom0comDriver' ./internal/vport | Tee-Object -FilePath dist/ci/com0com-driver.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: com0com-driver-report
+          path: dist/ci/com0com-driver.json
+          if-no-files-found: warn
+          retention-days: 3

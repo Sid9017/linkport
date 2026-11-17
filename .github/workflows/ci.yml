@@ -1,0 +1,48 @@
+name: Full compatibility
+
+on:
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        default: ""
+      tag:
+        type: string
+        default: ""
+    secrets:
+      LINKPORT_UPDATE_PUBLIC_KEY:
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: full-compatibility-${{ github.workflow }}-${{ inputs.ref || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    uses: ./.github/workflows/windows.yml
+    with:
+      full: true
+      ref: ${{ inputs.ref }}
+      tag: ${{ inputs.tag }}
+    secrets:
+      LINKPORT_UPDATE_PUBLIC_KEY: ${{ secrets.LINKPORT_UPDATE_PUBLIC_KEY }}
+  linux:
+    uses: ./.github/workflows/linux.yml
+    with:
+      full: true
+      ref: ${{ inputs.ref }}
+      tag: ${{ inputs.tag }}
+    secrets:
+      LINKPORT_UPDATE_PUBLIC_KEY: ${{ secrets.LINKPORT_UPDATE_PUBLIC_KEY }}
+  macos:
+    uses: ./.github/workflows/macos.yml
+    with:
+      full: true
+      ref: ${{ inputs.ref }}
+      tag: ${{ inputs.tag }}
+    secrets:
+      LINKPORT_UPDATE_PUBLIC_KEY: ${{ secrets.LINKPORT_UPDATE_PUBLIC_KEY }}

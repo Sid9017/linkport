@@ -1,0 +1,50 @@
+name: Windows
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      full:
+        description: Test both architectures and build desktop downloads
+        type: boolean
+        default: true
+  workflow_call:
+    inputs:
+      full:
+        type: boolean
+        default: false
+      ref:
+        type: string
+        default: ""
+      tag:
+        type: string
+        default: ""
+    secrets:
+      LINKPORT_UPDATE_PUBLIC_KEY:
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.workflow }}-${{ github.event_name }}-${{ inputs.ref || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref_type == 'branch') }}
+
+jobs:
+  compatibility:
+    uses: ./.github/workflows/platform.yml
+    with:
+      platform: windows
+      full: ${{ inputs.full || false }}
+      frontend-runner: windows-2022
+      browsers: chromium
+      targets: >-
+        ${{ inputs.full &&
+          '[{"os":"windows","arch":"amd64","runner":"windows-2022"},{"os":"windows","arch":"arm64","runner":"windows-11-arm"}]' ||
+          '[{"os":"windows","arch":"amd64","runner":"windows-2022"}]' }}
+      ref: ${{ inputs.ref || github.ref }}
+      tag: ${{ inputs.tag }}
+    secrets:
+      LINKPORT_UPDATE_PUBLIC_KEY: ${{ secrets.LINKPORT_UPDATE_PUBLIC_KEY }}

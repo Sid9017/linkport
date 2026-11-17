@@ -1,0 +1,50 @@
+name: macOS
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      full:
+        description: Test both architectures and build desktop downloads
+        type: boolean
+        default: true
+  workflow_call:
+    inputs:
+      full:
+        type: boolean
+        default: false
+      ref:
+        type: string
+        default: ""
+      tag:
+        type: string
+        default: ""
+    secrets:
+      LINKPORT_UPDATE_PUBLIC_KEY:
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-${{ github.workflow }}-${{ github.event_name }}-${{ inputs.ref || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref_type == 'branch') }}
+
+jobs:
+  compatibility:
+    uses: ./.github/workflows/platform.yml
+    with:
+      platform: darwin
+      full: ${{ inputs.full || false }}
+      frontend-runner: macos-15
+      browsers: chromium webkit
+      targets: >-
+        ${{ inputs.full &&
+          '[{"os":"darwin","arch":"arm64","runner":"macos-15"},{"os":"darwin","arch":"amd64","runner":"macos-15-intel"}]' ||
+          '[{"os":"darwin","arch":"arm64","runner":"macos-15"}]' }}
+      ref: ${{ inputs.ref || github.ref }}
+      tag: ${{ inputs.tag }}
+    secrets:
+      LINKPORT_UPDATE_PUBLIC_KEY: ${{ secrets.LINKPORT_UPDATE_PUBLIC_KEY }}

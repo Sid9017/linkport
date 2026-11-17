@@ -1,0 +1,79 @@
+name: Desktop
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        type: string
+        default: ""
+      tag:
+        type: string
+        default: ""
+      targets:
+        type: string
+        default: '[{"os":"darwin","arch":"arm64","runner":"macos-15"},{"os":"darwin","arch":"amd64","runner":"macos-15-intel"},{"os":"linux","arch":"amd64","runner":"ubuntu-24.04"},{"os":"linux","arch":"arm64","runner":"ubuntu-24.04-arm"},{"os":"windows","arch":"amd64","runner":"windows-2022"},{"os":"windows","arch":"arm64","runner":"windows-11-arm"}]'
+    secrets:
+      LINKPORT_UPDATE_PUBLIC_KEY:
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  desktop:
+    name: Desktop ${{ matrix.os }}_${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(inputs.targets) }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      GOTOOLCHAIN: local
+      GOFLAGS: -mod=readonly
+      CGO_ENABLED: ${{ matrix.os == 'windows' && '0' || '1' }}
+      MACOSX_DEPLOYMENT_TARGET: "14.5"
+      CGO_CFLAGS: ${{ matrix.os == 'darwin' && '-mmacosx-version-min=14.5' || '' }}
+      CGO_CXXFLAGS: ${{ matrix.os == 'darwin' && '-mmacosx-version-min=14.5' || '' }}
+      DESKTOP_TEST_LDFLAGS: ${{ matrix.os == 'darwin' && '-extldflags=-mmacosx-version-min=14.5' || '' }}
+      LINKPORT_UPDATE_PUBLIC_KEY: ${{ secrets.LINKPORT_UPDATE_PUBLIC_KEY }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.ref || github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.26.11"
+          cache: true
+          cache-dependency-path: |
+            go.sum
+            desktop/go.sum
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Install Linux desktop headers
+        if: matrix.os == 'linux'
+        run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
+      - name: Test desktop module
+        working-directory: desktop
+        run: go test -ldflags="$DESKTOP_TEST_LDFLAGS" -tags production -count=1 -timeout=5m ./...
+      - name: Build desktop archive
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          RELEASE_TARGET: ${{ matrix.os }}_${{ matrix.arch }}
+        run: |
+          args=()
+          if [[ -n "$RELEASE_TAG" ]]; then args+=(--tag "$RELEASE_TAG"); fi
+          python scripts/desktop.py --target "$RELEASE_TARGET" "${args[@]}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/desktop/*.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
