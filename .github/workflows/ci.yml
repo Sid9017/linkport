@@ -1,6 +1,7 @@
-name: Release compatibility
+name: Full compatibility
 
 on:
+  workflow_dispatch:
   workflow_call:
     inputs:
       ref:
@@ -16,10 +17,15 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: full-compatibility-${{ github.workflow }}-${{ inputs.ref || github.ref }}
+  cancel-in-progress: false
+
 jobs:
   windows:
     uses: ./.github/workflows/windows.yml
     with:
+      full: true
       ref: ${{ inputs.ref }}
       tag: ${{ inputs.tag }}
     secrets:
@@ -27,6 +33,7 @@ jobs:
   linux:
     uses: ./.github/workflows/linux.yml
     with:
+      full: true
       ref: ${{ inputs.ref }}
       tag: ${{ inputs.tag }}
     secrets:
@@ -34,6 +41,7 @@ jobs:
   macos:
     uses: ./.github/workflows/macos.yml
     with:
+      full: true
       ref: ${{ inputs.ref }}
       tag: ${{ inputs.tag }}
     secrets:

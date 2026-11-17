@@ -1,35 +1,74 @@
 # Compatibility testing
 
-Every branch push and pull request starts three independent GitHub Actions
-workflows: **Windows**, **Linux**, and **macOS**. Each tests native amd64 and
-arm64 backends and produces its own desktop downloads. Tests run on the target
-operating system rather than treating cross-compilation as runtime validation.
+Pull requests and pushes to `main` start three independent workflows:
+**Windows**, **Linux**, and **macOS**. Feature-branch pushes do not start a second
+copy of the PR checks. New PR commits cancel superseded runs for the same PR;
+manual full checks and release runs are not canceled this way.
+
+## Routine and full profiles
+
+Routine checks start **five runner jobs**: three native backend/desktop jobs,
+plus separate Linux and Windows frontend jobs. Each native job runs the root
+suite once, including virtual ports, and tests the desktop module without
+packaging it. The routine targets are Windows amd64, Linux amd64, and macOS arm64.
+
+Full checks run both architectures on every platform, all three frontend
+environments, and CLI/desktop archive builds for all six targets. They start
+**15 runner jobs** instead of repeating virtual-port packages in separate jobs.
+The release workflow explicitly selects this profile. Intel and Apple Silicon macOS
+downloads are both retained.
 
 | Layer | Windows | Linux | macOS |
 | --- | --- | --- | --- |
-| Backend | Native Go tests on both architectures | Native Go tests on both architectures | Native Go tests on both architectures |
-| Virtual port | Adapter validation and com0com decoder; driver suite compiled | Actual PTYs, bridge and local monitor; race detector | Actual PTYs, bridge and local monitor; race detector |
+| Routine native target | amd64 | amd64 | arm64 |
+| Full native targets | amd64 and arm64 | amd64 and arm64 | amd64 and arm64 |
+| Backend and virtual port | Root suite includes adapter/decoder tests; driver suite compiled | Root suite includes actual PTYs, bridge and local monitor; race detector | Root suite includes actual PTYs, bridge and local monitor; race detector |
 | Frontend | Chromium on Windows amd64 | Chromium and WebKit on Linux amd64 | Chromium and WebKit on Apple silicon |
-| Desktop | Native Wails module tests and packaging, both architectures | Native Wails module tests and packaging, both architectures | Native Wails module tests and packaging, both architectures |
-| com0com kernel driver | Separate dedicated-runner workflow | Not applicable | Not applicable |
+| Frontend schedule | Routine and full | Routine and full | Full only |
+| Desktop | Routine module tests; full packaging on both architectures | Routine module tests; full packaging on both architectures | Routine module tests; full packaging on both architectures |
+| com0com kernel driver | Separate manual dedicated-runner workflow | Not applicable | Not applicable |
 
 `windows.yml`, `linux.yml`, and `macos.yml` call `platform.yml` to keep shared
-steps consistent. Within each run, backend, virtual-port and frontend jobs
-run independently. All three must pass before `desktop.yml` builds that
-platform's two desktop archives. `ci.yml` is the reusable release entry point;
-the draft release waits for all three platform workflows and their packages.
+steps consistent. Native and frontend jobs remain independent. In the full
+profile both must pass before `desktop.yml` tests and builds that platform's
+two desktop archives. The draft release waits for all three platforms and their
+packages. Reusable calls pass the profile explicitly; they do not infer it from
+the caller's event name.
+
+After these workflows are available on the default branch, manually run all
+six targets without creating a release:
+
+```sh
+gh workflow run ci.yml --ref main
+```
+
+Or build only one platform's two architectures:
+
+```sh
+gh workflow run macos.yml --ref main -f full=true
+```
+
+Use the desired branch in `--ref`. Setting `full=false` on a platform workflow
+runs just its routine checks.
+
+Go dependencies and build outputs are cached using both modules' lockfiles.
+Routine reports are uploaded only on failure; full runs retain their reports
+for three days. Downloadable archives are retained for seven days. These
+changes reduce future compute/storage use; they do not restore already consumed
+included usage.
 
 ## Backend and PTY coverage
 
 The backend job runs the root module's full test suite, covering explicit
 sharing, persistence, peer identity, RFC 2217 framing and acknowledgements,
 session isolation, device removal and revocation. It also validates and
-packages the native CLI. Windows-specific tests cover fallback replacement on
-filesystems without POSIX rename support, preserving the previous file when
-replacement fails, and Unicode/long paths.
+packages the native CLI in the full profile. Windows-specific tests cover
+fallback replacement on filesystems without POSIX rename support, preserving
+the previous file when replacement fails, and Unicode/long paths.
 
-The separate Unix virtual-port job runs `internal/vport`, `internal/session`,
-`internal/engine` and `internal/p2p` with `-race`. These tests create actual operating-system
+The Unix backend job runs the whole root suite with `-race`, including
+`internal/vport`, `internal/session`, `internal/engine` and `internal/p2p`.
+These tests create actual operating-system
 PTYs and isolated simulated physical endpoints. Coverage includes binary
 round trips, parameter forwarding, reopening, independent mappings, blocked
 operation cancellation, local monitoring and physical-port ownership.
@@ -71,21 +110,22 @@ go test -tags production -count=1 -v -timeout=5m -run '^TestLiveDesktopBrowser$'
 
 `LINKPORT_CHROMIUM_PATH` optionally selects an installed Chrome executable.
 `LINKPORT_UI_OUTPUT` selects the screenshots, traces and JSON report directory;
-the default is `dist/ci/ui`. CI uploads these as `frontend-report-PLATFORM`.
-Backend and virtual-port jobs upload their Go JSON logs separately.
+the default is `dist/ci/ui`. CI uploads these as `frontend-report-PLATFORM` on
+failure or during full validation. Backend JSON logs include virtual-port
+results; routine desktop test logs are included in the same native report.
 Only fixture data is captured by the frontend workflow.
 
 ## Real com0com driver coverage
 
-The ordinary Windows workflow does **not** claim to test an installed com0com
+The hosted Windows workflow does **not** claim to test an installed com0com
 kernel driver. It executes decoder/adapter tests and compiles the driver
-integration suite for both Windows architectures.
+integration suite for each selected native target. Full validation covers
+both Windows architectures.
 
 `com0com.yml` provides a separate **Windows com0com driver** workflow. It runs
-only when explicitly dispatched, or when the repository variable
-`LINKPORT_COM0COM_CI` equals `true`. Otherwise its driver job is visibly skipped.
-It is not a default release gate and a green hosted Windows run does not mean
-the real driver has passed. This repository currently has no dedicated runner.
+only when explicitly dispatched. It is not a default release gate and a green
+hosted Windows run does not mean the real driver has passed. A dedicated runner
+must be configured before dispatching it.
 
 To enable it:
 
@@ -97,8 +137,8 @@ To enable it:
 3. Set repository variables `LINKPORT_TEST_COM0COM_PATH` to the application end
    (for example `COM121`) and `LINKPORT_TEST_COM0COM_PAIR` to the Linkport end
    (for example `COM122`).
-4. Set `LINKPORT_COM0COM_CI=true` to run it on subsequent pushes, or dispatch
-   the workflow after it is available in the default branch.
+4. Dispatch the workflow after it is available in the default branch. Routine
+   pushes and PR updates do not queue tests against the reserved pair.
 
 The job serializes access to the reserved pair and runs:
 

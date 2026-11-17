@@ -111,8 +111,8 @@ python3 scripts/release.py
 
 本机构建输出到 `dist/`，包含二进制、版本与说明、字体许可证和 SHA-256 校验文件。macOS 归档目前未签名和公证。
 
-GitHub Actions 对 macOS/Linux/Windows 的 amd64、arm64 分别构建 CLI 与 Wails 桌面归档。已有的 `v0.0.1` tag 必须与 `VERSION` 和提交一致，Release workflow 才会汇总归档并创建 **Draft / Pre-release**。工作流不会自动公开发布；发布签名只在配置对应密钥后生成。
+GitHub Actions 的手动全量检查和发版流程对 macOS/Linux/Windows 的 amd64、arm64 分别构建 CLI 与 Wails 桌面归档。已有的 `v0.0.1` tag 必须与 `VERSION` 和提交一致，Release workflow 才会汇总归档并创建 **Draft / Pre-release**。工作流不会自动公开发布；发布签名只在配置对应密钥后生成。
 
-每次推送和 PR 分别运行 Windows、Linux、macOS 三个 CI 流程，后端、虚拟串口和前端交互独立测试，通过后生成桌面包。Unix 使用真实 PTY 并运行 race 检查；Windows 的托管 runner 验证适配器与 com0com 解码器，真实驱动使用单独的专用 runner 流程，未配置时明确跳过。前端使用隔离数据在 Chromium/WebKit 中运行，报告、截图和 trace 随 CI 保存。覆盖范围和 com0com 配置见 [docs/ci.md](docs/ci.md)。
+PR 和 `main` 推送运行 Windows、Linux、macOS 三个 CI 流程，日常共五个 runner job：三平台各一个原生后端/虚拟串口/桌面模块检查，加 Linux 和 Windows 前端检查。功能分支不再重复触发 push 检查，新提交取消旧的 PR 检查。Unix 使用真实 PTY 和 race 检查；Windows 验证适配器、com0com 解码器并编译驱动测试。双架构、macOS 浏览器检查和安装包生成放到手动全量或发版流程，真实 com0com 驱动只在专用 runner 上手动测试。日常只保存失败报告，完整检查报告保留三天、归档保留七天。覆盖范围和操作方式见 [docs/ci.md](docs/ci.md)。
 
 完整流程见 [docs/releasing.md](docs/releasing.md)，架构与代码树见 [docs/architecture.md](docs/architecture.md)。

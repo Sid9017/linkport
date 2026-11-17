@@ -2,8 +2,6 @@ name: Windows com0com driver
 
 on:
   workflow_dispatch:
-  push:
-    branches: ["**"]
 
 permissions:
   contents: read
@@ -11,7 +9,6 @@ permissions:
 jobs:
   driver:
     name: Real com0com pair
-    if: vars.LINKPORT_COM0COM_CI == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: [self-hosted, Windows, X64, linkport-com0com]
     timeout-minutes: 10
     concurrency:
@@ -51,3 +48,4 @@ jobs:
           name: com0com-driver-report
           path: dist/ci/com0com-driver.json
           if-no-files-found: warn
+          retention-days: 3

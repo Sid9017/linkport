@@ -35,6 +35,10 @@ jobs:
       GOTOOLCHAIN: local
       GOFLAGS: -mod=readonly
       CGO_ENABLED: ${{ matrix.os == 'windows' && '0' || '1' }}
+      MACOSX_DEPLOYMENT_TARGET: "14.5"
+      CGO_CFLAGS: ${{ matrix.os == 'darwin' && '-mmacosx-version-min=14.5' || '' }}
+      CGO_CXXFLAGS: ${{ matrix.os == 'darwin' && '-mmacosx-version-min=14.5' || '' }}
+      DESKTOP_TEST_LDFLAGS: ${{ matrix.os == 'darwin' && '-extldflags=-mmacosx-version-min=14.5' || '' }}
       LINKPORT_UPDATE_PUBLIC_KEY: ${{ secrets.LINKPORT_UPDATE_PUBLIC_KEY }}
     steps:
       - uses: actions/checkout@v6
@@ -45,7 +49,10 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version: "1.26.11"
-          cache: false
+          cache: true
+          cache-dependency-path: |
+            go.sum
+            desktop/go.sum
       - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
@@ -54,7 +61,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y libgtk-4-dev libwebkitgtk-6.0-dev
       - name: Test desktop module
         working-directory: desktop
-        run: go test -tags production -count=1 -timeout=5m ./...
+        run: go test -ldflags="$DESKTOP_TEST_LDFLAGS" -tags production -count=1 -timeout=5m ./...
       - name: Build desktop archive
         env:
           RELEASE_TAG: ${{ inputs.tag }}
@@ -69,3 +76,4 @@ jobs:
           path: dist/desktop/*.zip
           if-no-files-found: error
           compression-level: 0
+          retention-days: 7

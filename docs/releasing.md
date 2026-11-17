@@ -75,14 +75,17 @@ GOCACHE=/tmp/linkport-gocache CGO_ENABLED=1 go build -mod=readonly -trimpath -bu
 
 ## CI and native platforms
 
-Every push and pull request runs separate Windows, Linux and macOS workflows.
-Each separates backend, virtual-port and frontend jobs, then builds both native
-desktop architectures after those checks pass. The release workflow calls
-`ci.yml`, which reuses all three platform workflows with the validated commit.
+Pull requests and `main` pushes run five routine jobs across separate Windows,
+Linux and macOS workflows. Root tests include virtual ports, desktop module
+tests share the native job, and Linux/Windows frontend checks remain separate.
+Feature-branch pushes do not duplicate PR checks; superseded PR runs are canceled.
+The release workflow calls `ci.yml`, which explicitly selects full validation
+on all six native targets and packages both desktop architectures per platform.
+The same full profile can be dispatched manually without creating a release.
 Only the final draft job gets `contents: write`. Coverage and driver-runner
 configuration are documented in [ci.md](ci.md).
 
-| GOOS | GOARCH | GitHub runner | cgo |
+| GOOS | GOARCH | GitHub runner | CLI cgo |
 | --- | --- | --- | --- |
 | darwin | arm64 | `macos-15` | enabled |
 | darwin | amd64 | `macos-15-intel` | enabled |
@@ -102,19 +105,22 @@ GitHub retired macOS 14 runners on November 2, 2026. `macos-15` is the native
 arm64 replacement; `macos-15-intel` builds amd64. Native macOS builds keep cgo
 enabled for detailed serial enumeration through IOKit. Do not replace these
 with Linux cross builds or disable cgo to make a build pass.
+Unix backend tests enable cgo for the race detector; Linux CLI archives
+continue to use `CGO_ENABLED=0`.
 
 Windows virtual ports require a compatible, preinstalled com0com driver and an
 existing port pair. The driver and its installer are not bundled. Hosted CI
 tests the Windows adapter and decoder without installing a driver. The separate
 `com0com.yml` workflow can test a real pair on a configured dedicated Windows
-x64 runner; it is skipped until enabled and is not a default release gate.
+x64 runner when manually dispatched; it is not a default release gate.
 Windows arm64 driver availability remains unverified. CLI macOS archives are
 unsigned; desktop apps have an ad-hoc signature. Neither is notarized. Hardware
 and native desktop usability need separate validation.
 
 ## Draft release procedure
 
-Each platform workflow calls `desktop.yml`, building with Go 1.26.11.
+Each platform workflow calls `desktop.yml` in the full profile, building with
+Go 1.26.11. Routine PR checks do not create downloadable archives.
 Desktop artifacts live under `dist/desktop` and use ZIP on each platform.
 `desktop-checksums.txt` lists only the six desktop ZIP filenames, matching the
 updater provider. With both update signing secrets configured, the release job
