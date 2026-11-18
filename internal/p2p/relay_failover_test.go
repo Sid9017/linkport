@@ -141,6 +141,9 @@ func TestRelayFailureRecoversWithoutEndpointRestart(t *testing.T) {
 	if !recovered {
 		t.Fatalf("secondary relay could not carry new requests: %v", last)
 	}
+	if a.Status().DetectedRelayCount != 1 || b.Status().DetectedRelayCount != 1 {
+		t.Fatal("a live home relay must count once even without network probes")
+	}
 	if relays[1].server.Snapshot()["datagrams_forwarded"] == 0 {
 		t.Fatalf("no fallback traffic; A=%+v B=%+v", a.Status(), b.Status())
 	}

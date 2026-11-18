@@ -453,11 +453,7 @@ globalThis.initializeLinkportLive = (root, request, motion, monitor) => {
   }
   function render() {
     const network = state.network;
-    const label = network.restartRequired ? "请重启 Linkport" : network.state !== "Running" ? "网络未运行" :
-      network.config?.relayMode === "disabled" ? "仅直连" :
-      network.relayConnected ? "中继已连接" : "中继未连接";
-    find("[data-network-state]").textContent = label;
-    find("[data-network-state]").title = network.relayError || network.homeRelay || "";
+    root.dispatchEvent(new CustomEvent("linkport:network", { detail: network }));
     find("[data-host-name]").textContent = network.hostName || "本机";
     find("[data-host-ip]").textContent = network.nodeID ? network.nodeID.slice(0, 12) + "…" : "—";
     find("[data-host-ip]").title = network.nodeID || "";
@@ -558,7 +554,7 @@ globalThis.initializeLinkportLive = (root, request, motion, monitor) => {
         sequences.set(session.id, session.records.at(-1)?.sequence || previous || 0);
       }
     } catch (error) {
-      find("[data-network-state]").textContent = "无法读取状态";
+      root.dispatchEvent(new CustomEvent("linkport:network", { detail: null }));
       find("[data-notice]").textContent = error.message;
     } finally { refreshing = false; }
   }
