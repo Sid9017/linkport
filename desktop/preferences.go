@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
@@ -18,7 +19,17 @@ type preferences struct {
 }
 
 func defaultPreferences() preferences {
-	return preferences{FontSize: 13, Language: "zh-CN", Theme: "system", CloseToTray: true, AutoUpdate: true}
+	return preferences{FontSize: 13, Language: languageForLocale(systemLocale()), Theme: "system", CloseToTray: true, AutoUpdate: true}
+}
+
+func languageForLocale(locale string) string {
+	parts := strings.FieldsFunc(strings.ToLower(strings.TrimSpace(locale)), func(r rune) bool {
+		return r == '-' || r == '_' || r == '.' || r == '@' || r == ':'
+	})
+	if len(parts) > 0 && parts[0] == "zh" {
+		return "zh-CN"
+	}
+	return "en"
 }
 
 func (settings preferences) validate() error {

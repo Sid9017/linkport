@@ -170,7 +170,7 @@ func (controller *updateController) start() {
 				return
 			case <-timer.C:
 				_ = controller.runJob(false)
-				timer.Reset(6 * time.Hour)
+				timer.Reset(time.Minute)
 			}
 		}
 	}()
