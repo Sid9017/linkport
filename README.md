@@ -254,7 +254,7 @@ script with `python3 scripts/release.py --self-test`. Desktop packages use
 `scripts/desktop.py`. Release automation publishes complete signed Stable releases and Nightly prereleases
 after full checks. Unpublished local archives carry a commit identity and never update themselves.
 Public downloads and channel-specific update manifests are served from
-`https://linkport.grezl.link`; the source repository can remain private. See the
+`https://linkport.grezl.link`. See the
 [release guide](docs/releasing.md).
 
 ## Documentation
@@ -272,3 +272,11 @@ Public downloads and channel-specific update manifests are served from
 | Builds, signing, and releases | [Release guide](docs/releasing.md) |
 
 Some detailed documents are currently written in Chinese.
+
+## License
+
+Linkport is licensed under the [MIT License](LICENSE).
+Third-party dependencies and bundled assets retain their respective licenses.
+See the notices in [design assets](docs/design/assets/fonts/) and
+[website assets](website/dist/assets/THIRD_PARTY_NOTICES.txt), including the
+separate licenses for fonts, GSAP, and ScrollTrigger.
