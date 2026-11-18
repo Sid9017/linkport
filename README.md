@@ -11,7 +11,7 @@ The desktop app includes a serial monitor, text and HEX sending, and independent
 sessions for multiple ports. A headless CLI runs the sharing service on machines
 without a desktop.
 
-**Status:** 0.0.3 early release series with Stable and Nightly release channels. Windows, macOS, and Linux are target
+**Status:** 0.0.4 early release series with Stable and Nightly release channels. Windows, macOS, and Linux are target
 platforms. Automated tests exercise encrypted loopback connections and isolated
 serial fixtures; real hardware, drivers, and cross-network behavior still need
 validation in their target environments.
