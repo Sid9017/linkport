@@ -6,3 +6,4 @@ website/dist/changelog.html
 website/dist/version.json
 
 /desktop/assets/cli/
+/.oil-ui/
