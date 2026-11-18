@@ -17,17 +17,17 @@ function renderDownloads() {
     else link.removeAttribute("href");
     link.setAttribute("aria-disabled", String(!valid));
     link.tabIndex = valid ? 0 : -1;
-    link.title = valid ? `${release.version} · SHA-256 ${artifact.sha256}` : "此渠道尚无可下载的安装包";
+    link.title = valid ? `${release.version} · SHA-256 ${artifact.sha256}` : window.linkportI18n.t("此渠道尚无可下载的安装包");
   }
   const checksums = document.querySelector("[data-checksums]");
   checksums.hidden = !release;
   if (release) checksums.href = release.checksums;
-  releaseNotes.textContent = selectedChannel === "nightly"
+  releaseNotes.textContent = window.linkportI18n.t(selectedChannel === "nightly"
     ? "Nightly 包含最新开发变更，仅更新到较新的 Nightly。调试前请保存工作。"
-    : "Stable 仅接收正式版本更新。0.0.x 仍处于早期阶段，请留意平台与硬件限制。";
-  if (release) releaseStatus.textContent = `${selectedChannel === "stable" ? "Stable" : "Nightly"} ${release.version} · ${new Date(release.publishedAt).toLocaleDateString("zh-CN")}`;
-  else if (releases) releaseStatus.textContent = `尚未发布 ${selectedChannel === "stable" ? "Stable" : "Nightly"} 安装包`;
-  else releaseStatus.textContent = releaseError ? "暂时无法获取版本，请稍后刷新。" : "正在获取可下载版本…";
+    : "Stable 仅接收正式版本更新。0.0.x 仍处于早期阶段，请留意平台与硬件限制。");
+  if (release) releaseStatus.textContent = `${selectedChannel === "stable" ? "Stable" : "Nightly"} ${release.version} · ${new Date(release.publishedAt).toLocaleDateString(window.linkportI18n.language)}`;
+  else if (releases) releaseStatus.textContent = window.linkportI18n.t("尚未发布 {channel} 安装包", {channel: selectedChannel === "stable" ? "Stable" : "Nightly"});
+  else releaseStatus.textContent = window.linkportI18n.t(releaseError ? "暂时无法获取版本，请稍后刷新。" : "正在获取可下载版本…");
 }
 
 channelButtons.forEach(button => button.addEventListener("click", () => {
@@ -35,6 +35,7 @@ channelButtons.forEach(button => button.addEventListener("click", () => {
   renderDownloads();
 }));
 renderDownloads();
+window.addEventListener("linkport:languagechange", renderDownloads);
 fetch("/api/releases", { signal: AbortSignal.timeout(25000) })
   .then(response => {
     if (!response.ok) throw new Error("release service unavailable");

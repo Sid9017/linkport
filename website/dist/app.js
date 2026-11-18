@@ -1,3 +1,4 @@
+const t = (...args) => window.linkportI18n.t(...args);
 const stepContent = [
   { title: "邀请一次，记住彼此。", description: "每台新设备单独邀请，导入后自动交换公钥，双方互相信任。", note: "8 小时有效 · 每次配对一台设备", next: "下一步：共享串口" },
   { title: "只开放你选中的串口。", description: "在共享端勾选目标端口，对端便能看到。试试右侧的共享开关。", note: "新接入的设备默认不共享", next: "下一步：本机连接" },
@@ -50,10 +51,10 @@ function setStep(nextStep, focusTab = false) {
     stepPanels[index].hidden = !selected;
   });
   const content = stepContent[nextStep];
-  document.getElementById("step-title").textContent = content.title;
-  document.getElementById("step-description").textContent = content.description;
-  document.getElementById("step-note").textContent = content.note;
-  document.querySelector("#step-next span").textContent = content.next;
+  document.getElementById("step-title").textContent = t(content.title);
+  document.getElementById("step-description").textContent = t(content.description);
+  document.getElementById("step-note").textContent = t(content.note);
+  document.querySelector("#step-next span").textContent = t(content.next);
   if (focusTab) stepTabs[nextStep].focus();
   if (window.gsap && !reducedMotion.matches) {
     gsap.fromTo(stepPanels[nextStep], { opacity: .4, y: 5 }, {
@@ -77,14 +78,15 @@ stepTabs.forEach((tab, index) => {
 });
 document.getElementById("step-next").addEventListener("click", () => setStep((currentStep + 1) % stepTabs.length));
 document.getElementById("back-to-sharing").addEventListener("click", () => setStep(1, true));
-document.getElementById("demo-share").addEventListener("change", event => {
-  const shared = event.target.checked;
-  document.getElementById("shared-count").textContent = shared ? "1 个已共享" : "0 个已共享";
-  document.getElementById("share-status").textContent = shared ? "共享中" : "未共享";
-  document.getElementById("sharing-feedback").textContent = shared ? "未选中的串口，对端不可见。" : "当前没有共享串口，对端无法连接。";
+function syncSharing() {
+  const shared = document.getElementById("demo-share").checked;
+  document.getElementById("shared-count").textContent = t(shared ? "1 个已共享" : "0 个已共享");
+  document.getElementById("share-status").textContent = t(shared ? "共享中" : "未共享");
+  document.getElementById("sharing-feedback").textContent = t(shared ? "未选中的串口，对端不可见。" : "当前没有共享串口，对端无法连接。");
   document.getElementById("mapping-available").hidden = !shared;
   document.getElementById("mapping-unavailable").hidden = shared;
-});
+}
+document.getElementById("demo-share").addEventListener("change", syncSharing);
 
 const networkDemo = document.querySelector(".network-demo");
 const networkFlow = document.querySelector(".network-flow");
@@ -98,9 +100,9 @@ function syncNetworkAnimation() {
   if (!networkAnimation) return;
   if (networkRequested && networkVisible) networkAnimation.play();
   else networkAnimation.pause();
-  networkToggle.setAttribute("aria-label", networkRequested ? "暂停连接动画" : "播放连接动画");
+  networkToggle.setAttribute("aria-label", t(networkRequested ? "暂停连接动画" : "播放连接动画"));
   networkToggle.setAttribute("aria-pressed", String(networkRequested));
-  networkToggle.querySelector("span").textContent = networkRequested ? "暂停" : "播放";
+  networkToggle.querySelector("span").textContent = t(networkRequested ? "暂停" : "播放");
   networkToggle.querySelector("use").setAttribute("href", networkRequested ? "#i-pause" : "#i-play");
 }
 
@@ -150,20 +152,27 @@ const mobileMenu = document.getElementById("mobile-nav");
 function closeMenu(returnFocus = false) {
   mobileMenu.hidden = true;
   menuToggle.setAttribute("aria-expanded", "false");
-  menuToggle.setAttribute("aria-label", "打开导航");
+  menuToggle.setAttribute("aria-label", t("打开导航"));
   if (returnFocus) menuToggle.focus();
 }
 menuToggle.addEventListener("click", () => {
   const expanded = menuToggle.getAttribute("aria-expanded") === "true";
   mobileMenu.hidden = expanded;
   menuToggle.setAttribute("aria-expanded", String(!expanded));
-  menuToggle.setAttribute("aria-label", expanded ? "打开导航" : "关闭导航");
+  menuToggle.setAttribute("aria-label", t(expanded ? "打开导航" : "关闭导航"));
 });
 mobileMenu.querySelectorAll("a").forEach(link => link.addEventListener("click", () => closeMenu()));
 document.addEventListener("keydown", event => {
   if (event.key === "Escape" && !mobileMenu.hidden) closeMenu(true);
 });
 matchMedia("(min-width: 901px)").addEventListener("change", event => { if (event.matches) closeMenu(); });
+window.addEventListener("linkport:languagechange", () => {
+  setStep(currentStep);
+  syncSharing();
+  syncNetworkAnimation();
+  drawSceneCable();
+  window.ScrollTrigger?.refresh();
+});
 
 if (window.gsap && window.ScrollTrigger) {
   gsap.registerPlugin(ScrollTrigger);

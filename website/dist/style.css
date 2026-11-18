@@ -63,6 +63,10 @@ img { max-width: 100%; }
 .desktop-nav a { padding: 10px 0; transition: color .15s; }
 .desktop-nav a:hover { color: #111; }
 .header-actions { display: flex; align-items: center; gap: 12px; }
+.language-switch { display: inline-flex; flex: 0 0 auto; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 7px; }
+.language-switch button { min-width: 32px; min-height: 30px; padding: 3px 6px; border: 0; border-radius: 4px; background: transparent; color: var(--muted); font: inherit; font-size: 11px; cursor: pointer; }
+.language-switch button[aria-pressed="true"] { background: var(--ink); color: white; }
+.docs-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .menu-toggle { display: none; flex-direction: column; gap: 6px; }
 .menu-toggle span { display: block; width: 19px; height: 1.5px; background: currentColor; transition: transform .18s; }
 .menu-toggle[aria-expanded="true"] span:first-child { transform: translateY(3.75px) rotate(45deg); }
@@ -362,6 +366,7 @@ h2 { font-size: clamp(28px, 2.8vw, 36px); line-height: 1.35; letter-spacing: -.0
   .brand { font-size: 23px; }
   .brand img { width: 27px; height: 27px; }
   .header-actions { gap: 6px; }
+  .header-actions > a { display: none; }
   .github-link { display: none; }
   .button-small { min-height: 36px; padding: 7px 10px; gap: 10px; font-size: 12px; }
   .button-small > .icon { width: 14px; }
