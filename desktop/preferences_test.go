@@ -35,6 +35,43 @@ func TestPreferencesPersistAndValidate(t *testing.T) {
 	}
 }
 
+func TestLanguageForSystemLocale(t *testing.T) {
+	for _, test := range []struct{ locale, want string }{
+		{"zh-CN", "zh-CN"}, {"zh-Hant-TW", "zh-CN"}, {"zh_HK.UTF-8", "zh-CN"},
+		{" ZH_sg ", "zh-CN"}, {"zh_CN:en_US", "zh-CN"},
+		{"en-US", "en"}, {"en_GB.UTF-8", "en"}, {"fr-FR", "en"},
+		{"ja-JP", "en"}, {"de_DE:zh_CN", "en"}, {"C.UTF-8", "en"},
+		{"", "en"}, {"zho", "en"},
+	} {
+		t.Run(test.locale, func(t *testing.T) {
+			if got := languageForLocale(test.locale); got != test.want {
+				t.Fatalf("locale %q: got %q, want %q", test.locale, got, test.want)
+			}
+		})
+	}
+}
+
+func TestSavedLanguageOverridesSystemDefault(t *testing.T) {
+	for _, language := range []string{"zh-CN", "en"} {
+		t.Run(language, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "desktop.json")
+			store, err := newPreferenceStore(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			settings := store.get()
+			settings.Language = language
+			if err := store.save(settings); err != nil {
+				t.Fatal(err)
+			}
+			reloaded, err := newPreferenceStore(path)
+			if err != nil || reloaded.get().Language != language {
+				t.Fatalf("saved language was replaced by system default: %v", err)
+			}
+		})
+	}
+}
+
 func TestNativeAPIRequiresLaunchToken(t *testing.T) {
 	store, err := newPreferenceStore(filepath.Join(t.TempDir(), "desktop.json"))
 	if err != nil {

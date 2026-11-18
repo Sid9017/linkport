@@ -4,3 +4,5 @@ node_modules/
 .netlify/
 website/dist/changelog.html
 website/dist/version.json
+
+/desktop/assets/cli/

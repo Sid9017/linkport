@@ -62,6 +62,13 @@ jobs:
       - name: Test desktop module
         working-directory: desktop
         run: go test -ldflags="$DESKTOP_TEST_LDFLAGS" -tags production -count=1 -timeout=5m ./...
+      - name: Verify bundled CLI in an isolated user environment
+        if: matrix.os != 'windows'
+        run: |
+          mkdir -p desktop/assets/cli
+          go build -o desktop/assets/cli/linkport.bin ./cmd/linkport
+          (cd desktop && go test -ldflags="$DESKTOP_TEST_LDFLAGS" -tags production,bundledcli -count=1 -timeout=5m -run '^TestBundledCLIInNewTerminal$' .)
+          rm desktop/assets/cli/linkport.bin
       - name: Build desktop archive
         env:
           RELEASE_TAG: ${{ inputs.tag }}
@@ -69,6 +76,7 @@ jobs:
         run: |
           args=()
           if [[ -n "$RELEASE_TAG" ]]; then args+=(--tag "$RELEASE_TAG"); fi
+          python scripts/desktop_test.py
           python scripts/desktop.py --target "$RELEASE_TARGET" "${args[@]}"
       - uses: actions/upload-artifact@v4
         with:

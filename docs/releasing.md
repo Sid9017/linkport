@@ -13,10 +13,10 @@ python3 scripts/version.py patch
 
 | Channel | Version and tag | Distribution and updates |
 | --- | --- | --- |
-| Stable | `0.0.2`, tag `v0.0.2` | Published GitHub release; only newer Stable updates |
-| Nightly | `0.0.2-nightly.YYYYMMDDHHMMSS.RUN`, matching `v` tag | Prerelease; only newer Nightly updates |
+| Stable | `0.0.3`, tag `v0.0.3` | Published GitHub release; only newer Stable updates |
+| Nightly | `0.0.3-nightly.YYYYMMDDHHMMSS.RUN`, matching `v` tag | Prerelease; only newer Nightly updates |
 
-Unpublished local/CI archives use `0.0.2-dev.EPOCH.gCOMMIT[.dirty]` metadata,
+Unpublished local/CI archives use `0.0.3-dev.EPOCH.gCOMMIT[.dirty]` metadata,
 appear as "Local build" in the desktop UI, and never check for updates. They are
 not a third public download or update channel. A plain `go build` reports the
 base `-dev` version with unknown commit/date.
@@ -63,19 +63,20 @@ Do not run two channels simultaneously against the same configuration.
 After reviewing changes and passing checks, commit the release sources, then:
 
 ```sh
-git tag v0.0.2
-git push origin v0.0.2
+git tag v0.0.3
+git push origin v0.0.3
 ```
 
 The tag event runs `release.yml`. An existing reviewed tag can also be dispatched:
 
 ```sh
-gh workflow run release.yml -f tag=v0.0.2
+gh workflow run release.yml -f tag=v0.0.3
 ```
 
 The workflow validates the version and tag, runs full root/desktop/frontend
-checks, builds twelve native packages, checks the expected filename sets,
-generates CLI and desktop SHA-256 lists and signs every archive. Both
+checks and builds the native CLI/desktop CI artifacts. Publication validates the
+six desktop archive names, generates desktop SHA-256 checksums, and signs only
+the desktop archives. Both
 `LINKPORT_UPDATE_PRIVATE_KEY` and `LINKPORT_UPDATE_PUBLIC_KEY` are mandatory;
 a missing or mismatched signing key fails publication. Private keys reach only
 the final signing job, never platform build jobs or the website.
@@ -123,3 +124,13 @@ Disabling automatic downloads keeps version checks active. Unpublished local bui
 replace themselves. Test a real upgrade separately from provider/fixture tests.
 Users of 0.0.1 must manually install 0.0.2 or later once to switch to the new
 public update source.
+
+## Desktop-only release assets
+
+New published releases upload the six `linkport-desktop_*.zip` archives,
+`desktop-checksums.txt` and their `.sig` files. Standalone CLI archives remain
+available as full-CI build artifacts, but are not published as Release assets.
+The desktop build embeds the corresponding console CLI; its first normal launch
+registers the user command as described in [desktop.md](desktop.md#bundled-command-line-tool).
+Update signatures remain required by the public download service and updater.
+Existing published releases are not modified by this workflow change.

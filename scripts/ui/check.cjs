@@ -797,12 +797,21 @@ async function checkApplicationUpdates(page, browserName) {
       if (browserName === "chromium" && process.env.LINKPORT_CHROMIUM_PATH) {
         launch.executablePath = process.env.LINKPORT_CHROMIUM_PATH;
       }
+      console.log(`[${browserName}] launching browser`);
       browser = await playwright[browserName].launch(launch);
+      console.log(`[${browserName}] creating context`);
       context = await browser.newContext({ viewport: { width: 1120, height: 780 }, colorScheme: "light" });
+      context.setDefaultTimeout(30000);
+      context.setDefaultNavigationTimeout(30000);
+      console.log(`[${browserName}] starting trace`);
       await context.tracing.start({ screenshots: true, snapshots: true });
+      console.log(`[${browserName}] functional checks`);
       await checkFunctional(await context.newPage(), browserName);
+      console.log(`[${browserName}] empty layout checks`);
       await checkEmptyLayout(await context.newPage(), browserName);
+      console.log(`[${browserName}] device management checks`);
       await checkDeviceManagement(await context.newPage(), browserName);
+      console.log(`[${browserName}] update checks`);
       await checkApplicationUpdates(await context.newPage(), browserName);
       results.push({ browser: browserName, platform, status: "passed", source: "isolated API fixtures and bundled Wails runtime" });
     } catch (error) {
@@ -814,9 +823,11 @@ async function checkApplicationUpdates(page, browserName) {
       }
       process.exitCode = 1;
     } finally {
+      console.log(`[${browserName}] stopping trace and closing browser`);
       if (context) await context.tracing.stop({ path: path.join(output, `${browserName}-trace.zip`) });
       if (browser) await browser.close();
       fs.writeFileSync(path.join(output, "report.json"), JSON.stringify(results, null, 2));
+      console.log(`[${browserName}] complete`);
     }
   }
   console.log(JSON.stringify(results));

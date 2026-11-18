@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.0.3 — desktop CLI and update delivery
+
+- Embed the matching console CLI in Desktop and register a per-user `linkport`
+  command on first launch, without administrator access. Desktop upgrades carry
+  the corresponding CLI; existing commands and saved settings are preserved.
+- Publish Desktop archives only, with their update signatures and checksums;
+  standalone CLI archives remain full-CI artifacts rather than Release assets.
+- Check Stable/Nightly updates every minute after the initial thirty-second delay.
+- Follow the system UI language on first launch: Chinese uses Simplified Chinese;
+  English and unsupported languages use English. Saved choices take precedence.
+- Validate CLI registration and upgrades in isolated user directories. Windows
+  environment registration and real serial hardware still need target-environment
+  verification; hosted native build checks do not certify drivers or hardware.
+
+
 ## 0.0.2 — release channels and pairing fixes
 
 - Keep the Tokyo relay bundled with the application, retain its operator signature,

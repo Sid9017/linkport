@@ -69,6 +69,25 @@ def mac_bundle(directory, binary, version, env):
     return app
 
 
+def build_executables(go, env, flags, binary):
+    # Embed the matching CLI so executable-only desktop updates also update
+    # the command. Keep Windows CLI in console mode (no -H windowsgui).
+    cli_flags = flags.replace(" -H windowsgui", "")
+    payload = DESKTOP / "assets/cli/linkport.bin"
+    payload.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        subprocess.run([
+            go, "build", "-mod=readonly", "-trimpath", "-buildvcs=false",
+            "-ldflags", cli_flags, "-o", str(payload), "./cmd/linkport",
+        ], cwd=ROOT, env=env, check=True)
+        subprocess.run([
+            go, "build", "-mod=readonly", "-tags", "production,bundledcli",
+            "-trimpath", "-buildvcs=false", "-ldflags", flags, "-o", str(binary), ".",
+        ], cwd=DESKTOP, env=env, check=True)
+    finally:
+        payload.unlink(missing_ok=True)
+
+
 def build(output, expected_target, go, tag):
     base = release.read_version()
     version, channel = release.build_version(base, tag)
@@ -116,10 +135,7 @@ def build(output, expected_target, go, tag):
     with tempfile.TemporaryDirectory(prefix="linkport-desktop-") as temporary:
         staging = Path(temporary)
         binary = staging / ("Linkport.exe" if system == "windows" else "linkport-desktop")
-        subprocess.run([
-            go, "build", "-mod=readonly", "-tags", "production",
-            "-trimpath", "-buildvcs=false", "-ldflags", flags, "-o", str(binary), ".",
-        ], cwd=DESKTOP, env=env, check=True)
+        build_executables(go, env, flags, binary)
         if system == "darwin":
             bundle = mac_bundle(staging, binary, base, env)
             destination = output / "Linkport.app"

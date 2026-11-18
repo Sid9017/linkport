@@ -223,6 +223,12 @@ func main() {
 	}
 	api.onPreferencesChanged = localizeMenu
 	localizeMenu(settings.get())
+	app.Event.OnApplicationEvent(events.Common.ApplicationStarted, func(*application.ApplicationEvent) {
+		if err := installBundledCLI(); err != nil {
+			log.Printf("CLI installation failed: %v", err)
+			app.Dialog.Error().SetTitle("Linkport CLI setup").SetMessage("Could not register the bundled CLI. Desktop remains available.\n\n" + err.Error()).Show()
+		}
+	})
 	go live.Run()
 	if err := app.Run(); err != nil {
 		log.Fatal(err)

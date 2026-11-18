@@ -11,7 +11,7 @@ The desktop app includes a serial monitor, text and HEX sending, and independent
 sessions for multiple ports. A headless CLI runs the sharing service on machines
 without a desktop.
 
-**Status:** 0.0.2 early release series with Stable and Nightly release channels. Windows, macOS, and Linux are target
+**Status:** 0.0.3 early release series with Stable and Nightly release channels. Windows, macOS, and Linux are target
 platforms. Automated tests exercise encrypted loopback connections and isolated
 serial fixtures; real hardware, drivers, and cross-network behavior still need
 validation in their target environments.
@@ -35,6 +35,8 @@ serial access decisions remain on the two devices. Address discovery helps locat
 a device, while its online status comes from an authenticated service probe.
 
 ## Run the desktop app
+
+Desktop archives include the matching `linkport` command-line tool. Extract and launch Desktop once, then open a new terminal to run `linkport version` or `linkport ports`; no separate CLI download is needed. Desktop upgrades update the bundled CLI on the next launch. See [CLI setup](docs/desktop.md#bundled-command-line-tool).
 
 The CLI and desktop modules both pin **Go 1.26.11**. The desktop app uses
 **Wails v3.1.0** and has a separate Go module under `desktop/`.

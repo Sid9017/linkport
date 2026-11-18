@@ -93,7 +93,12 @@ func TestLiveDesktopBrowser(t *testing.T) {
 	mux.Handle("/", design.DesktopHandlerWithToken(api.token))
 	server := httptest.NewServer(mux)
 	defer server.Close()
-	command := exec.CommandContext(ctx, "node", script, server.URL)
+	// Stop the driver before the outer Go timeout so partial browser diagnostics
+	// remain available, even when a renderer or a protocol operation stalls.
+	driverContext, stopDriver := context.WithTimeout(ctx, 4*time.Minute)
+	defer stopDriver()
+	command := exec.CommandContext(driverContext, "node", script, server.URL)
+	command.WaitDelay = 5 * time.Second
 	output, err := command.CombinedOutput()
 	t.Log(string(output))
 	if err != nil {

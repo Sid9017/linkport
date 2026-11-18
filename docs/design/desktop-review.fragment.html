@@ -1031,7 +1031,7 @@
   for (const element of all(".lp-topology, .lp-local, .lp-devices, .lp-porttree")) curveObserver.observe(element);
   document.fonts.ready.then(drawCurves);
   }
-  const defaults = { fontSize: 13, language: "zh-CN", theme: "system", closeToTray: true, autoUpdate: true };
+  const defaults = { fontSize: 13, language: /^zh(?:[-_]|$)/i.test(navigator.language || "") ? "zh-CN" : "en", theme: "system", closeToTray: true, autoUpdate: true };
   let preferences = { ...defaults };
   let preferenceRevision = 0;
   let saveQueue = Promise.resolve();

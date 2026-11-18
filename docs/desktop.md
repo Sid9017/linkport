@@ -31,7 +31,61 @@ The application sets its runtime window/tray icon. Installers and production
 code signing are separate release work. Linux native builds require GTK 4
 and WebKitGTK 6 development headers. macOS packaging targets macOS 14.5+.
 
+## Bundled command-line tool
+
+Published Releases contain desktop archives, desktop checksums and update signatures.
+The desktop executable embeds a console-mode `linkport` built from the same commit,
+version, channel and target. A separate CLI download is no longer needed. After
+extracting the desktop archive, launch Desktop once, then open a new terminal:
+
+```sh
+linkport version
+linkport ports
+```
+
+There is no installer yet: extracting a ZIP alone cannot register a command.
+First launch installs the CLI for the current user without administrator access:
+
+- macOS/Linux: immutable executables under `~/.local/share/linkport/cli/versions/`,
+  with a stable command at `~/.local/share/linkport/cli/bin/linkport`. Startup
+  snippets append that directory to PATH in `.profile`, `.bashrc`, the existing
+  first Bash login profile, `.zprofile`/`.zshrc` (respecting `ZDOTDIR`), and Fish's
+  `conf.d/linkport.fish` (respecting `XDG_CONFIG_HOME`). Bash, Zsh and Fish are supported.
+- Windows: immutable executables under `%LOCALAPPDATA%\Linkport\cli\versions\`.
+  The current version's directory is added to the user PATH in `HKCU\Environment`;
+  previous Linkport version entries are replaced. Explorer receives an environment
+  change notification. Restart the terminal application so it inherits the new PATH.
+
+Source-only `go run` and `--version` do not install commands or change PATH.
+The CLI is embedded rather than shipped beside the GUI so Windows/Linux
+executable-only automatic updates include it. Each normal desktop launch repairs
+missing registration and selects the bundled CLI. Old executable versions remain
+available for running processes; they are not deleted automatically. Copying or
+moving the desktop application does not break the installed command.
+
+Existing unrelated commands are not overwritten; PATH additions are appended,
+so an earlier `linkport` installation can take precedence. Use `command -v linkport`
+(Windows: `where.exe linkport`) to check which command is selected. CLI setup
+failures produce a desktop dialog; the GUI remains usable. Correct filesystem or
+profile conflicts and restart Desktop to retry.
+
+CLI and Desktop use the same configuration and retain exclusive identity locks.
+Quit Desktop before using CLI commands that manage identity/pairing or start
+`serve`; bundling does not make them control the running desktop process.
+
+To remove the CLI, quit Desktop, remove the CLI directory above, then remove
+startup blocks headed `# Linkport desktop CLI` (or the Linkport version directory
+from Windows user PATH). Remove Desktop as well to prevent registration on launch.
+Native Windows registration and Linux desktop installation require validation on
+those systems; cross-compilation alone does not verify their environment changes.
+
 ## Settings and device pairing
+
+First launch follows the system's primary UI language: Chinese selects Simplified
+Chinese, English selects English, and other or unavailable languages fall back
+to English. macOS uses the preferred language list, Windows uses the preferred
+UI language list, and Linux uses locale environment variables. Saved language
+choices take precedence over the system default.
 
 The top-right gear controls text size, Chinese/English language, monochrome
 theme, close-to-tray behaviour and background update preference. The native
@@ -101,8 +155,8 @@ Stable and Nightly never cross channels. Dev builds show their development
 version/commit, disable update checks and cannot replace themselves. The UI
 version comes from build metadata rather than a hardcoded label.
 
-Stable/Nightly checks start thirty seconds after launch and repeat every six
-hours, including when automatic downloads are disabled. Manual checks are
+Stable/Nightly checks start thirty seconds after launch and repeat every
+minute, including when automatic downloads are disabled. Manual checks are
 immediate. The UI reads cached native state every fifteen seconds and every
 three seconds while Settings is open; those reads do not query the remote feed.
 There is no inbound update listener or push subscription.
