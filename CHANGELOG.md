@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.0.4 — desktop CLI and update delivery
+## 0.0.5 — desktop CLI and update delivery
 
 - Embed the matching console CLI in Desktop and register a per-user `linkport`
   command on first launch, without administrator access. Desktop upgrades carry
@@ -13,13 +13,19 @@
 - Validate CLI registration and upgrades in isolated user directories. Windows
   environment registration and real serial hardware still need target-environment
   verification; hosted native build checks do not certify drivers or hardware.
-- Make reduced-motion keyboard checks wait for the requested disclosure state,
-  and retain bounded browser deadlines and stage diagnostics.
+- Wait for modal close completion before clicking the underlying device button,
+  and for a visible close control before checking focus styles. Keep reduced-motion
+  keyboard assertions, bounded browser deadlines and stage diagnostics.
+
+## 0.0.4 — validation tag only
+
+Publication was blocked by a modal-transition fixture timing failure. No release
+assets were published; the desktop delivery changes are included in 0.0.5.
 
 ## 0.0.3 — validation tag only
 
 Publication was blocked by a WebKit fixture timing failure. No release assets
-were published; the desktop delivery changes are included in 0.0.4.
+were published; the desktop delivery changes are included in 0.0.5.
 
 ## 0.0.2 — release channels and pairing fixes
 

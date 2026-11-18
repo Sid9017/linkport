@@ -51,6 +51,7 @@ async function settleMotion(page) {
 
 async function checkCloseFrame(page, selector) {
   const button = page.locator(selector);
+  await button.waitFor({ state: "visible" });
   await button.focus();
   const frame = await button.evaluate(node => {
     const style = getComputedStyle(node);
@@ -598,8 +599,12 @@ async function checkDeviceManagement(page, browserName) {
   await page.waitForFunction(()=>document.querySelector("[data-relay-update-status]").textContent.includes("随应用更新"));
   assert.equal(await page.locator("[data-relay-update-action]").isVisible(),false);
   await page.locator("[data-settings-close]").click();
+  // A click completes before the modal's closing animation. Wait until its
+  // backdrop leaves the top layer before clicking the underlying title bar.
+  await page.locator("[data-settings-dialog]").waitFor({ state: "hidden" });
 
   await page.locator("[data-device-manager-open]").first().click();
+  await page.locator("[data-devices-dialog]").waitFor({ state: "visible" });
   await checkCloseFrame(page, "[data-devices-close]");
   await page.waitForFunction(() => document.querySelector("[data-device-id]").textContent.length === 64);
   assert.equal(await page.locator("[data-device-id]").textContent(), id);
