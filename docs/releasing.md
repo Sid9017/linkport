@@ -132,6 +132,13 @@ public update source.
 
 ## Desktop-only release assets
 
+If Windows packaging is interrupted after all native checks and Mac/Linux
+packages succeed, `resume-desktop-release.yml` can complete the two Windows
+packages and publication using `tag` and `original-run` inputs. It verifies the
+original run's source and successful checks before reusing its artifacts. The
+corrected packaging fixture runs from the recovery workflow revision outside
+the checkout; application builds still use the original clean, immutable tag.
+
 New published releases upload the six `linkport-desktop_*.zip` archives and
 `desktop-checksums.txt`, with no standalone `.sig` files. Each checksum line
 is followed by `# ed25519 BASE64_SIGNATURE FILENAME`; the signature authenticates

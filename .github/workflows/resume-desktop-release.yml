@@ -1,0 +1,168 @@
+name: Resume desktop release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing stable tag whose native checks already passed
+        required: true
+        type: string
+      original-run:
+        description: Original release run containing the completed Mac and Linux packages
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  windows:
+    name: Complete Windows ${{ matrix.arch }} package
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: windows-2022
+          - arch: arm64
+            runner: windows-11-arm
+    defaults:
+      run:
+        shell: bash
+    env:
+      GOTOOLCHAIN: local
+      GOFLAGS: -mod=readonly
+      CGO_ENABLED: "0"
+      LINKPORT_UPDATE_PUBLIC_KEY: ${{ secrets.LINKPORT_UPDATE_PUBLIC_KEY }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: |
+            go.sum
+            desktop/go.sum
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - name: Validate corrected packaging tests and build the original tagged source
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          PACKAGING_TESTS_REF: ${{ github.workflow_sha }}
+          RELEASE_TARGET: windows_${{ matrix.arch }}
+        run: |
+          python scripts/release.py --validate-only --tag "$RELEASE_TAG"
+          # Run the corrected host-permission fixture outside the checkout.
+          # The application source, tag and clean-tree validation stay intact.
+          git show "$PACKAGING_TESTS_REF:scripts/desktop_test.py" > "$RUNNER_TEMP/linkport-desktop-test.py"
+          PYTHONPATH="$GITHUB_WORKSPACE/scripts" python "$RUNNER_TEMP/linkport-desktop-test.py"
+          python scripts/desktop.py --target "$RELEASE_TARGET" --tag "$RELEASE_TAG"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-windows-${{ matrix.arch }}
+          path: dist/desktop/*.zip
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+
+  publish:
+    needs: windows
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      actions: read
+    defaults:
+      run:
+        shell: bash
+    env:
+      RELEASE_TAG: ${{ inputs.tag }}
+      ORIGINAL_RUN: ${{ inputs.original-run }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: refs/tags/${{ inputs.tag }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.13"
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Require successful native checks and matching original source
+        run: |
+          python scripts/release.py --validate-only --tag "$RELEASE_TAG"
+          python - <<'PY'
+          import json, os, subprocess
+          repo, run = os.environ["GH_REPO"], os.environ["ORIGINAL_RUN"]
+          if not run.isdecimal():
+              raise SystemExit("invalid original run")
+          def api(path):
+              return json.loads(subprocess.check_output(["gh", "api", f"repos/{repo}/{path}"], text=True))
+          source = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+          original = api(f"actions/runs/{run}")
+          if original["head_sha"] != source or original["path"] != ".github/workflows/release.yml":
+              raise SystemExit("original release source mismatch")
+          jobs = api(f"actions/runs/{run}/jobs?per_page=100")["jobs"]
+          required = [job for job in jobs if job["name"] != "publish" and "Desktop windows_" not in job["name"]]
+          if len(required) != 14 or any(job["conclusion"] != "success" for job in required):
+              raise SystemExit("original native checks and Mac/Linux packages must all pass")
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.original-run }}
+          pattern: desktop-*
+          path: dist/desktop
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*
+          path: dist/desktop
+          merge-multiple: true
+      - name: Validate payloads and sign checksum metadata
+        env:
+          LINKPORT_UPDATE_PRIVATE_KEY: ${{ secrets.LINKPORT_UPDATE_PRIVATE_KEY }}
+          LINKPORT_UPDATE_PUBLIC_KEY: ${{ secrets.LINKPORT_UPDATE_PUBLIC_KEY }}
+        run: |
+          python - <<'PY'
+          import os, sys, zipfile
+          from pathlib import Path
+          sys.path.insert(0, "scripts")
+          import release
+          version, channel = release.build_version(release.read_version(), os.environ["RELEASE_TAG"])
+          if channel != "stable":
+              raise SystemExit("resume supports stable releases only")
+          expected = {f"linkport-desktop_{version}_{system}_{arch}.zip" for system, arch in release.TARGETS}
+          if {p.name for p in Path("dist/desktop").glob("*.zip")} != expected:
+              raise SystemExit("incomplete desktop archive set")
+          for system, arch in release.TARGETS:
+              payload = "Linkport.app" if system == "darwin" else "Linkport.exe" if system == "windows" else "linkport-desktop"
+              executable = "Linkport.app/Contents/MacOS/linkport-desktop" if system == "darwin" else payload
+              with zipfile.ZipFile(Path("dist/desktop") / f"linkport-desktop_{version}_{system}_{arch}.zip") as archive:
+                  names = archive.namelist()
+                  if {name.split("/")[0] for name in names} != {payload} or executable not in names:
+                      raise SystemExit("incompatible application payload")
+          PY
+          test -n "$LINKPORT_UPDATE_PRIVATE_KEY"
+          test -n "$LINKPORT_UPDATE_PUBLIC_KEY"
+          go run ./tools/update-sign -sign-dir dist/desktop
+      - name: Publish the completed release without standalone signatures
+        run: |
+          python scripts/release_notes_test.py
+          python scripts/release-notes.py --tag "$RELEASE_TAG" --output dist/release-notes.md
+          gh release create "$RELEASE_TAG" dist/desktop/*.zip dist/desktop/desktop-checksums.txt \
+            --verify-tag --draft --target "$(git rev-parse HEAD)" \
+            --title "Linkport $RELEASE_TAG · stable" --notes-file dist/release-notes.md
+          gh release edit "$RELEASE_TAG" --draft=false --latest=true

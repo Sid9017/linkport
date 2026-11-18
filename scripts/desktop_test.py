@@ -84,7 +84,11 @@ class DesktopArchiveTests(unittest.TestCase):
                     self.assertEqual({name.split("/")[0] for name in packaged.namelist()}, {payload})
                     entry = f"{payload}/Contents/MacOS/{executable}" if system == "darwin" else payload
                     self.assertEqual(packaged.read(entry), b"desktop with embedded CLI")
-                    self.assertEqual(packaged.getinfo(entry).external_attr >> 16, 0o100755)
+                    # A simulated .app uses the host filesystem's permissions;
+                    # Windows cannot model Unix executable bits. Native Mac
+                    # packaging must preserve the source bundle's actual mode.
+                    mode = (output / entry).stat().st_mode & 0o777 if system == "darwin" else 0o755
+                    self.assertEqual(packaged.getinfo(entry).external_attr >> 16, 0o100000 | mode)
                     if system == "darwin":
                         self.assertEqual(packaged.read(f"{payload}/Contents/Info.plist"), b"bundle metadata")
                     else:
