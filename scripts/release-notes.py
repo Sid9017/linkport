@@ -11,7 +11,7 @@ def notes(tag):
     base = release.read_version()
     version, channel = release.build_version(base, tag)
     text = (release.ROOT / "CHANGELOG.md").read_text()
-    match = re.search(rf"^## {re.escape(base)}(?: .*)?\n(.*?)(?=^## |\Z)", text, re.M | re.S)
+    match = re.search(rf"^## {re.escape(base)}(?: [^\n]*)?\n(.*?)(?=^## |\Z)", text, re.M | re.S)
     if match is None:
         raise ValueError("current base version needs a CHANGELOG section")
     return (

@@ -96,7 +96,7 @@ jobs:
           LINKPORT_UPDATE_PUBLIC_KEY: ${{ secrets.LINKPORT_UPDATE_PUBLIC_KEY }}
         run: |
           python - <<'PY'
-          import os
+          import os, zipfile
           from pathlib import Path
           import sys
           sys.path.insert(0, "scripts")
@@ -106,6 +106,14 @@ jobs:
           actual = {p.name for p in Path("dist/desktop").glob("*.zip")}
           if actual != names:
               raise SystemExit(f"desktop archive mismatch: {actual ^ names}")
+          for system, arch in release.TARGETS:
+              filename = f"linkport-desktop_{version}_{system}_{arch}.zip"
+              payload = "Linkport.app" if system == "darwin" else "Linkport.exe" if system == "windows" else "linkport-desktop"
+              executable = "Linkport.app/Contents/MacOS/linkport-desktop" if system == "darwin" else payload
+              with zipfile.ZipFile(Path("dist/desktop") / filename) as archive:
+                  entries = archive.namelist()
+                  if {name.split("/")[0] for name in entries} != {payload} or executable not in entries:
+                      raise SystemExit(f"incompatible desktop payload: {filename}")
           PY
           test -n "$LINKPORT_UPDATE_PRIVATE_KEY"
           test -n "$LINKPORT_UPDATE_PUBLIC_KEY"
@@ -118,6 +126,7 @@ jobs:
           RELEASE_CHANNEL: ${{ needs.validate.outputs.channel }}
           RELEASE_COMMIT: ${{ needs.validate.outputs.commit }}
         run: |
+          python scripts/release_notes_test.py
           python scripts/release-notes.py --tag "$RELEASE_TAG" --output dist/release-notes.md
           args=()
           if [[ "$RELEASE_CHANNEL" == "nightly" ]]; then args+=(--prerelease); fi

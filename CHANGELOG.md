@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.0.6 — compatible desktop update packages
+
+- Package exactly one application payload per Desktop ZIP: Linkport.app on
+  macOS, Linkport.exe on Windows, or linkport-desktop on Linux. Remove top-level
+  documentation and metadata so the Wails updater can extract the application.
+- Retain the embedded CLI, version/channel metadata and font license inside the
+  application; upgrades carry the matching command-line tool.
+- Keep publisher signatures inline in desktop-checksums.txt. Release assets
+  contain six Desktop ZIPs and one checksum file, with no standalone .sig or CLI
+  downloads. The public gateway supports both inline and legacy signatures.
+- Add English/Chinese website switching with English as the first-visit default
+  and a saved language preference across the homepage and documentation.
+- Preserve the current version's changes in generated release notes.
+- Verify the archive layout for all six targets locally and confirm a real macOS
+  archive reaches the Wails updater's ready state in isolated staging.
+
+
 ## 0.0.5 — desktop CLI and update delivery
 
 - Embed the matching console CLI in Desktop and register a per-user `linkport`
