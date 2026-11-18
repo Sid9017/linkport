@@ -13,10 +13,10 @@ python3 scripts/version.py patch
 
 | Channel | Version and tag | Distribution and updates |
 | --- | --- | --- |
-| Stable | `0.0.3`, tag `v0.0.3` | Published GitHub release; only newer Stable updates |
-| Nightly | `0.0.3-nightly.YYYYMMDDHHMMSS.RUN`, matching `v` tag | Prerelease; only newer Nightly updates |
+| Stable | `0.0.4`, tag `v0.0.4` | Published GitHub release; only newer Stable updates |
+| Nightly | `0.0.4-nightly.YYYYMMDDHHMMSS.RUN`, matching `v` tag | Prerelease; only newer Nightly updates |
 
-Unpublished local/CI archives use `0.0.3-dev.EPOCH.gCOMMIT[.dirty]` metadata,
+Unpublished local/CI archives use `0.0.4-dev.EPOCH.gCOMMIT[.dirty]` metadata,
 appear as "Local build" in the desktop UI, and never check for updates. They are
 not a third public download or update channel. A plain `go build` reports the
 base `-dev` version with unknown commit/date.
@@ -63,14 +63,14 @@ Do not run two channels simultaneously against the same configuration.
 After reviewing changes and passing checks, commit the release sources, then:
 
 ```sh
-git tag v0.0.3
-git push origin v0.0.3
+git tag v0.0.4
+git push origin v0.0.4
 ```
 
 The tag event runs `release.yml`. An existing reviewed tag can also be dispatched:
 
 ```sh
-gh workflow run release.yml -f tag=v0.0.3
+gh workflow run release.yml -f tag=v0.0.4
 ```
 
 The workflow validates the version and tag, runs full root/desktop/frontend
