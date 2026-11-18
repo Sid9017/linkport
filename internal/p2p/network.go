@@ -49,6 +49,7 @@ type Status struct {
 	Ticket                string                  `json:"ticket"`
 	HomeRelay             string                  `json:"homeRelay,omitempty"`
 	RelayConnected        bool                    `json:"relayConnected"`
+	DetectedRelayCount    int                     `json:"detectedRelayCount"`
 	RelayError            string                  `json:"relayError,omitempty"`
 	Config                NetworkConfig           `json:"config"`
 	RestartRequired       bool                    `json:"restartRequired"`
@@ -220,6 +221,12 @@ func (n *Network) Status() Status {
 				state.RelayError = home.LastError.Error()
 			}
 		}
+		report, _ := n.endpoint.NetReport()
+		connectedHome := ""
+		if state.RelayConnected {
+			connectedHome = state.HomeRelay
+		}
+		state.DetectedRelayCount = detectedRelayCount(report, connectedHome)
 	}
 	if n.restart {
 		state.State = "RestartRequired"

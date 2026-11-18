@@ -3,8 +3,25 @@ package p2p
 import (
 	"time"
 
+	"github.com/tmc/go-iroh/iroh"
 	"github.com/tmc/go-iroh/netaddr"
 )
+
+// Count relays observed by the latest network probe, plus the currently
+// connected home relay (which may not support the probe protocol).
+// A configured address alone is not evidence that a relay was detected.
+func detectedRelayCount(report iroh.NetReport, connectedHome string) int {
+	detected := make(map[string]struct{}, len(report.RelayLatencies)+1)
+	for url := range report.RelayLatencies {
+		if url.String() != "" {
+			detected[url.String()] = struct{}{}
+		}
+	}
+	if connectedHome != "" {
+		detected[connectedHome] = struct{}{}
+	}
+	return len(detected)
+}
 
 // relayRecoveryLoop rotates a failed configured home relay without rebuilding the
 // endpoint. A cooldown prevents repeatedly selecting a known-dead first entry.

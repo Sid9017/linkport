@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Separate the title bar's device-pairing icon from relay status. Show a green
+  dot only for a connected relay, a gray dot otherwise, and the deduplicated
+  count from the latest network probe plus the connected home relay.
+- Show an arrow-and-text update button for available, downloading, ready and
+  retry states, with download progress and English/Chinese labels.
+- Avoid repeatedly announcing unchanged relay status during polling.
+
 ## 0.0.7 — native desktop packages and reliable updates
 
 - Ship macOS DMG, Windows EXE and Debian/Ubuntu DEB desktop packages for both architectures, with the CLI embedded and no ZIP or standalone signature assets.

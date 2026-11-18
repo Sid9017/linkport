@@ -762,6 +762,79 @@ async function checkDeviceManagement(page, browserName) {
   assert.deepEqual(errors, []);
 }
 
+async function checkTopbar(page, browserName) {
+  await initializePage(page);
+  let network = { state: "Running", relayConnected: false, detectedRelayCount: 0, publicRelays: ["https://one.example", "https://two.example"], nodeID: "a".repeat(64), config: {relayMode: "default", relayURLs: []} };
+  let update = { configured: true, state: "up-to-date", version: "0.0.7", channel: "stable" };
+  let unavailable = false;
+  await page.route("**/native/v1/network", route => route.fulfill(unavailable ? {status:503,body:"Unavailable"} : {contentType:"application/json",body:JSON.stringify(network)}));
+  await page.route("**/native/v1/state", route => route.fulfill(unavailable ? {status:503,body:"Unavailable"} : {contentType:"application/json",body:JSON.stringify({network,localPorts:[],sharedPorts:[],devices:[],sessions:[]})}));
+  await page.route("**/native/v1/devices", route => route.fulfill({contentType:"application/json",body:"[]"}));
+  await page.route("**/native/v1/update", route => route.fulfill({contentType:"application/json",body:JSON.stringify(update)}));
+  await page.goto(origin, {waitUntil:"networkidle"});
+  const status = page.locator("[data-relay-status]");
+  await page.waitForFunction(() => document.querySelector("[data-network-state]").textContent === "中继 0");
+  assert.equal(await status.getAttribute("data-connected"), "false");
+  const repeatedStatusMutations = await page.evaluate(() => new Promise(resolve => {
+    const indicator = document.querySelector("[data-relay-status]");
+    let mutations = 0;
+    const observer = new MutationObserver(records => { mutations += records.length; });
+    observer.observe(indicator, {attributes:true,childList:true,characterData:true,subtree:true});
+    document.querySelector("#linkport-review").addEventListener("linkport:network", () => {
+      queueMicrotask(() => { observer.disconnect(); resolve(mutations); });
+    }, {once:true});
+  }));
+  assert.equal(repeatedStatusMutations, 0, "unchanged relay polls must not repeatedly announce a live status");
+  const disconnectedColor = await status.locator(".lp-dot").evaluate(node => getComputedStyle(node).backgroundColor);
+  assert.equal(await page.locator("[data-update-badge]").isVisible(), false);
+  await status.click();
+  assert.equal(await page.locator("[data-devices-dialog]").isVisible(), false, "relay status must not open pairing");
+  await page.locator(".lp-titletools [data-device-manager-open]").click();
+  await page.locator("[data-devices-dialog]").waitFor({state:"visible"});
+  await page.locator("[data-devices-close]").click();
+  await page.locator("[data-devices-dialog]").waitFor({state:"hidden"});
+  network = {...network, relayConnected: true, detectedRelayCount: 2};
+  await page.waitForFunction(() => document.querySelector("[data-relay-status]").dataset.connected === "true" && document.querySelector("[data-network-state]").textContent === "中继 2");
+  const connectedColor = await status.locator(".lp-dot").evaluate(node => getComputedStyle(node).backgroundColor);
+  assert.notEqual(connectedColor, disconnectedColor);
+  const rgb = connectedColor.match(/\d+/g).map(Number);
+  assert.ok(rgb[1] > rgb[0] && rgb[1] > rgb[2], "a connected relay uses a green indicator");
+  update = {...update, state:"available", next:"0.0.8"};
+  await page.locator("[data-settings-open]").click();
+  await page.locator("[data-update-badge]").waitFor({state:"visible"});
+  assert.equal(await page.locator("[data-update-label]").innerText(), "更新");
+  assert.equal(await page.locator("[data-update-badge] use").getAttribute("href"), "#lp-icon-update");
+  await page.locator("[data-settings-close]").click();
+  await page.locator("[data-settings-dialog]").waitFor({state:"hidden"});
+  await page.screenshot({path:path.join(output,`${browserName}-topbar-update-available.png`)});
+  await page.locator("[data-update-badge]").click();
+  await page.locator("[data-settings-dialog]").waitFor({state:"visible"});
+  update = {...update,state:"downloading",progress:0.42};
+  await page.waitForFunction(() => document.querySelector("[data-update-label]").textContent.includes("42%"));
+  assert.equal(await page.locator("[data-update-badge]").isDisabled(),true);
+  update = {...update,state:"ready"};
+  await page.waitForFunction(() => document.querySelector("[data-update-label]").textContent === "更新就绪");
+  assert.equal(await page.locator("[data-update-badge]").isDisabled(),false);
+  await page.locator('[data-preference="language"]').selectOption("en");
+  await page.locator('[data-preference="theme"]').selectOption("dark");
+  await page.locator('[data-preference="fontSize"]').selectOption("18");
+  await page.setViewportSize({width:760,height:540});
+  await page.waitForFunction(() => document.querySelector("[data-network-state]").textContent === "Relays 2");
+  assert.match(await status.getAttribute("aria-label"), /Relay connected/);
+  assert.equal(await page.locator("[data-update-label]").innerText(),"Update ready");
+  await page.locator("[data-settings-close]").click();
+  await page.locator("[data-settings-dialog]").waitFor({state:"hidden"});
+  await page.evaluate(async () => { await document.fonts.ready; });
+  const frames = await page.locator(".lp-titlebar").evaluate(bar => [...bar.querySelectorAll(".lp-brand, .lp-titletools")].map(node=>{const b=node.getBoundingClientRect();return {left:b.left,right:b.right,top:b.top,bottom:b.bottom};}));
+  assert.ok(frames[0].right <= frames[1].left && frames[1].right <= 760, "large-text titlebar must not overlap or clip controls");
+  await page.screenshot({path:path.join(output,`${browserName}-topbar-dark-compact.png`)});
+  network = {...network,relayConnected:false,detectedRelayCount:0,config:{relayMode:"disabled",relayURLs:[]}};
+  await page.waitForFunction(() => document.querySelector("[data-relay-status]").dataset.connected === "false" && document.querySelector("[data-relay-status]").getAttribute("aria-label").includes("Direct only"));
+  unavailable = true;
+  await page.waitForFunction(() => document.querySelector("[data-network-state]").textContent === "Relays —");
+  assert.equal(await status.getAttribute("data-connected"),"false");
+}
+
 async function checkApplicationUpdates(page, browserName) {
   await initializePage(page);
   let update = { configured: true, state: "available", version: "0.0.2-nightly.20261117000000.1", channel: "nightly", next: "0.0.2-nightly.20261118000000.2" };
@@ -851,6 +924,8 @@ async function checkApplicationUpdates(page, browserName) {
       await checkEmptyLayout(await context.newPage(), browserName);
       console.log(`[${browserName}] device management checks`);
       await checkDeviceManagement(await context.newPage(), browserName);
+      console.log(`[${browserName}] topbar checks`);
+      await checkTopbar(await context.newPage(), browserName);
       console.log(`[${browserName}] update checks`);
       await checkApplicationUpdates(await context.newPage(), browserName);
       results.push({ browser: browserName, platform, status: "passed", source: "isolated API fixtures and bundled Wails runtime" });
