@@ -8,6 +8,8 @@
 - Show an arrow-and-text update button for available, downloading, ready and
   retry states, with download progress and English/Chinese labels.
 - Avoid repeatedly announcing unchanged relay status during polling.
+- Retry a failed update restart using the prepared package instead of issuing
+  another update check.
 
 ## 0.0.7 — native desktop packages and reliable updates
 

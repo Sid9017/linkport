@@ -839,15 +839,26 @@ async function checkApplicationUpdates(page, browserName) {
   await initializePage(page);
   let update = { configured: true, state: "available", version: "0.0.2-nightly.20261117000000.1", channel: "nightly", next: "0.0.2-nightly.20261118000000.2" };
   let restarted = false;
+  let restartRequests = 0;
+  let checkRequests = 0;
+  let downloadRequests = 0;
   await page.route("**/native/v1/update", route => route.fulfill({ contentType: "application/json", body: JSON.stringify(update) }));
   await page.route("**/native/v1/update/download", route => {
     assert.equal(route.request().headers()["x-linkport-token"], "browser-test-only");
+    downloadRequests++;
     update.state = "ready";
     return route.fulfill({ status: 202, body: "" });
   });
   await page.route("**/native/v1/update/restart", route => {
+    assert.equal(route.request().headers()["x-linkport-token"], "browser-test-only");
+    restartRequests++;
     restarted = true;
+    if (update.errorCode === "restart-failed") update = {...update, state:"ready", errorCode:"", error:""};
     return route.fulfill({ status: 202, body: "" });
+  });
+  await page.route("**/native/v1/update/check", route => {
+    checkRequests++;
+    return route.fulfill({status:202,body:""});
   });
   await page.goto(origin, { waitUntil: "networkidle" });
   await page.locator("[data-update-badge]").waitFor({ state: "visible" });
@@ -860,6 +871,25 @@ async function checkApplicationUpdates(page, browserName) {
   await page.screenshot({ path: path.join(output, `${browserName}-nightly-update-ready.png`) });
   await page.locator("[data-update-action]").click();
   assert.equal(restarted, true);
+  for (const [language, label] of [["zh-CN", "重试重启更新"], ["en", "Retry restart to update"]]) {
+    await page.locator('[data-preference="language"]').selectOption(language);
+    update = {...update, state:"error", errorCode:"restart-failed", errorStage:"restart", error:"fixture helper launch failure"};
+    await page.waitForFunction(label => document.querySelector("[data-update-action]").getAttribute("aria-label") === label, label);
+    await page.locator("[data-settings-close]").click();
+    await page.locator("[data-settings-dialog]").waitFor({state:"hidden"});
+    await page.locator("[data-update-badge]").click();
+    await page.locator("[data-settings-dialog]").waitFor({state:"visible"});
+    const previousRestarts = restartRequests;
+    const restartResponse = page.waitForResponse(response => response.url().endsWith("/native/v1/update/restart") && response.request().method() === "POST");
+    await page.locator("[data-update-action]").click();
+    await restartResponse;
+    assert.equal(restartRequests, previousRestarts + 1, "restart failure retry must call the restart endpoint");
+    assert.equal(checkRequests, 0, "a prepared update must not retry by checking again");
+    assert.equal(downloadRequests, 1, "restart retry must reuse the already verified download");
+    await page.waitForFunction(() => !document.querySelector("[data-update-status]").textContent.includes("失败") &&
+      !document.querySelector("[data-update-status]").textContent.includes("Could not restart"));
+  }
+  await page.locator('[data-preference="language"]').selectOption("zh-CN");
   for (const [code, message] of [
     ["check-timeout", "检查更新超时"],
     ["download-timeout", "下载超时"],

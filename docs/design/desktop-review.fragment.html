@@ -1246,6 +1246,7 @@
     "无法读取状态": "Unable to read status",
     "操作失败，请重试": "Action failed. Please try again.",
     "重启并更新": "Restart to update",
+    "重试重启更新": "Retry restart to update",
     "正在检查更新": "Checking for updates",
     "正在下载": "Downloading",
     "正在校验": "Verifying",
@@ -1448,6 +1449,11 @@
     find("[data-update-label]").textContent = label;
     badge.setAttribute("aria-label", label + (appUpdate && updateState.next ? " · " + updateState.next : ""));
   }
+  function updateOperation() {
+    if (updateState.errorCode === "restart-failed" ||
+        ["ready", "package-ready", "installer-opened"].includes(updateState.state)) return "restart";
+    return updateState.state === "available" ? "download" : "check";
+  }
   async function refreshUpdate() {
     if (!nativeDesktop) return;
     try {
@@ -1467,7 +1473,10 @@
       renderUpdateBadge();
       const button = find("[data-update-action]");
       button.disabled = !updateState.configured || ["checking", "downloading", "verifying", "installing"].includes(updateState.state);
-      button.setAttribute("aria-label", ["package-ready","installer-opened"].includes(updateState.state) ? "打开安装器" : updateState.state === "ready" ? "重启并更新" : updateState.state === "available" ? "下载更新" : "检查更新");
+      let actionLabel = {restart:"重启并更新", download:"下载更新", check:"检查更新"}[updateOperation()];
+      if (["package-ready", "installer-opened"].includes(updateState.state)) actionLabel = "打开安装器";
+      else if (updateState.errorCode === "restart-failed") actionLabel = "重试重启更新";
+      button.setAttribute("aria-label", actionLabel);
     } catch { find("[data-update-status]").textContent = "操作失败，请重试"; }
   }
   function openSettings() {
@@ -1655,7 +1664,7 @@
       find("[data-update-status]").textContent = "桌面版中检查更新";
       return;
     }
-    const operation = ["ready","package-ready","installer-opened"].includes(updateState.state) ? "restart" : updateState.state === "available" ? "download" : "check";
+    const operation = updateOperation();
     try { await nativeRequest("update/" + operation, "POST"); refreshUpdate(); }
     catch { find("[data-update-status]").textContent = "操作失败，请重试"; }
   });
