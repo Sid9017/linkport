@@ -54,6 +54,37 @@ test("all six desktop packages require matching checksums and publisher signatur
   await assert.rejects(publicRelease(r, read, publicKey), /checksums missing/);
 });
 
+test("inline checksum signatures support releases with no sidecar files and reject tampering", async () => {
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  const r = release("v0.0.5");
+  const digest = createHash("sha256").update("desktop fixture").digest();
+  const signature = sign(null, digest, privateKey).toString("base64");
+  const lines = [];
+  for (const platform of ["darwin", "linux", "windows"]) {
+    for (const arch of ["amd64", "arm64"]) {
+      const filename = `linkport-desktop_0.0.5_${platform}_${arch}.zip`;
+      r.assets.push({ name: filename, size: 15 });
+      lines.push(`${digest.toString("hex")}  ${filename}`, `# ed25519 ${signature} ${filename}`);
+    }
+  }
+  r.assets.push({ name: "desktop-checksums.txt", size: 2000 });
+  let metadata = lines.join("\n");
+  const read = async asset => {
+    assert.equal(asset.name, "desktop-checksums.txt");
+    return metadata;
+  };
+  const result = await publicRelease(r, read, publicKey);
+  assert.equal(result.artifacts.length, 6);
+  assert.deepEqual(result.cli, []);
+  assert.ok(result.artifacts.every(artifact => artifact.signature === signature));
+  metadata = lines.join("\n").replace(signature, Buffer.alloc(64).toString("base64"));
+  await assert.rejects(publicRelease(r, read, publicKey), /signature rejected/);
+  metadata = lines.slice(0, -1).join("\n");
+  await assert.rejects(publicRelease(r, read, publicKey), /incomplete desktop release/);
+  metadata = [...lines, lines[1]].join("\n");
+  await assert.rejects(publicRelease(r, read, publicKey), /invalid release signatures/);
+});
+
 test("unconfigured and failed release services do not claim to be up to date or leak credentials", async () => {
   const notConfigured = createHandler({ fetcher: () => assert.fail("unconfigured service fetched GitHub") });
   assert.equal((await notConfigured(new Request("https://example.com/api/releases"))).status, 503);

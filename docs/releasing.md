@@ -47,7 +47,12 @@ python3 scripts/desktop.py --output dist/desktop-dev
 Names identify both program and complete version:
 `linkport-desktop_VERSION_GOOS_GOARCH.zip` for desktop;
 `linkport_VERSION_GOOS_GOARCH.tar.gz` for Unix CLI or `.zip` for Windows CLI.
-Archives include `VERSION`, `CHANNEL`, documentation and dependency licenses.
+Desktop ZIPs contain exactly one top-level payload: `Linkport.app` on macOS,
+`Linkport.exe` on Windows, or `linkport-desktop` on Linux. This is required by
+the Wails updater. Version/channel metadata and the bundled CLI remain embedded
+in the executable; the font license remains embedded with the font assets.
+CLI-only CI archives also include `VERSION`, `CHANNEL`, documentation and
+dependency licenses.
 The native executable retains its normal name. macOS bundle numeric versions
 use the base version; the app, updater and archive show the complete version.
 
@@ -75,14 +80,14 @@ gh workflow run release.yml -f tag=v0.0.5
 
 The workflow validates the version and tag, runs full root/desktop/frontend
 checks and builds the native CLI/desktop CI artifacts. Publication validates the
-six desktop archive names, generates desktop SHA-256 checksums, and signs only
-the desktop archives. Both
+six desktop archive names and writes SHA-256 digests and their Ed25519
+signatures into `desktop-checksums.txt`. Both
 `LINKPORT_UPDATE_PRIVATE_KEY` and `LINKPORT_UPDATE_PUBLIC_KEY` are mandatory;
 a missing or mismatched signing key fails publication. Private keys reach only
 the final signing job, never platform build jobs or the website.
 
-A draft is assembled first and published only after every archive, checksum
-and signature has uploaded. Stable becomes the latest release; Nightly is a
+A draft is assembled first and published only after every archive and the
+signed checksum metadata have uploaded. Stable becomes the latest release; Nightly is a
 prerelease and never replaces Stable as latest. Notes come from the current
 base version's CHANGELOG section. A failed partial draft stays unpublished;
 inspect it before retrying. No installer is offered from a CI artifact page.
@@ -127,9 +132,12 @@ public update source.
 
 ## Desktop-only release assets
 
-New published releases upload the six `linkport-desktop_*.zip` archives,
-`desktop-checksums.txt` and their `.sig` files. Standalone CLI archives remain
-available as full-CI build artifacts, but are not published as Release assets.
+New published releases upload the six `linkport-desktop_*.zip` archives and
+`desktop-checksums.txt`, with no standalone `.sig` files. Each checksum line
+is followed by `# ed25519 BASE64_SIGNATURE FILENAME`; the signature authenticates
+the raw SHA-256 digest. The public gateway verifies these inline signatures and
+continues to support older releases with sidecar signatures. Standalone CLI
+archives remain available as full-CI build artifacts, but are not published as Release assets.
 The desktop build embeds the corresponding console CLI; its first normal launch
 registers the user command as described in [desktop.md](desktop.md#bundled-command-line-tool).
 Update signatures remain required by the public download service and updater.

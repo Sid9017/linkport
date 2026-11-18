@@ -45,7 +45,14 @@ export async function publicRelease(release, readAsset, verificationKey = key) {
   const checksumAsset = assets.get("desktop-checksums.txt");
   if (!checksumAsset) throw new Error("release checksums missing");
   const checksums = new Map();
+  const signatures = new Map();
   for (const line of (await readAsset(checksumAsset)).trim().split("\n")) {
+    if (line.startsWith("# ed25519 ")) {
+      const match = /^# ed25519 ([A-Za-z0-9+/]{86}==) (linkport-desktop_[^\s/\\]+\.zip)$/.exec(line);
+      if (!match || signatures.has(match[2])) throw new Error("invalid release signatures");
+      signatures.set(match[2], match[1]);
+      continue;
+    }
     const match = /^([a-f0-9]{64})  (linkport-desktop_[^\s/\\]+\.zip)$/.exec(line);
     if (!match || checksums.has(match[2])) throw new Error("invalid release checksums");
     checksums.set(match[2], match[1]);
@@ -54,8 +61,10 @@ export async function publicRelease(release, readAsset, verificationKey = key) {
     const filename = `linkport-desktop_${version}_${target}.zip`;
     const asset = assets.get(filename), signatureAsset = assets.get(filename + ".sig");
     const digest = checksums.get(filename);
-    if (!asset || !signatureAsset || !digest) throw new Error("incomplete desktop release");
-    const signature = (await readAsset(signatureAsset)).trim();
+    if (!asset || !digest || (!signatures.has(filename) && !signatureAsset)) throw new Error("incomplete desktop release");
+    // Existing releases used sidecar files. New releases carry their signatures
+    // in the checksum metadata, keeping those files out of the download list.
+    const signature = signatures.get(filename) ?? (await readAsset(signatureAsset)).trim();
     const decoded = Buffer.from(signature, "base64");
     if (decoded.length !== 64 || !verify(null, Buffer.from(digest, "hex"), verificationKey, decoded)) {
       throw new Error("publisher signature rejected");

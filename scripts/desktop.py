@@ -152,13 +152,8 @@ def build(output, expected_target, go, tag):
         else:
             shutil.copy2(binary, output / binary.name)
             entries = [(binary.name, binary.read_bytes(), 0o755)]
-        entries.extend([
-            ("VERSION", f"{version}\n".encode(), 0o644),
-            ("CHANNEL", f"{channel}\n".encode(), 0o644),
-            ("README.md", (ROOT / "README.md").read_bytes(), 0o644),
-            ("CHANGELOG.md", (ROOT / "CHANGELOG.md").read_bytes(), 0o644),
-            ("licenses/Geist-OFL.txt", (ROOT / "docs/design/assets/fonts/OFL.txt").read_bytes(), 0o644),
-        ])
+        # Wails replaces one application payload per update. Extra top-level
+        # documentation or metadata would make its archive extractor reject it.
         archive = output / f"linkport-desktop_{version}_{system}_{arch}.zip"
         release.write_archive(archive, entries, epoch)
     write_checksums(output)

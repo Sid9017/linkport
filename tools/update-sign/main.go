@@ -16,7 +16,7 @@ import (
 
 func main() {
 	generate := flag.String("generate", "", "write a NEW private signing key to this file")
-	directory := flag.String("sign-dir", "", "sign Linkport CLI and desktop archives in this directory")
+	directory := flag.String("sign-dir", "", "write signed desktop checksum metadata in this directory")
 	flag.Parse()
 	if err := run(*generate, *directory); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -63,18 +63,14 @@ func run(generate, directory string) error {
 	if expected != "" && expected != base64.StdEncoding.EncodeToString(public) {
 		return fmt.Errorf("signing private key does not match the embedded public key")
 	}
-	archives, err := filepath.Glob(filepath.Join(directory, "linkport*.zip"))
+	archives, err := filepath.Glob(filepath.Join(directory, "linkport-desktop_*.zip"))
 	if err != nil {
 		return err
 	}
-	tarballs, err := filepath.Glob(filepath.Join(directory, "linkport_*.tar.gz"))
-	if err != nil {
-		return err
-	}
-	archives = append(archives, tarballs...)
 	if len(archives) == 0 {
-		return fmt.Errorf("no Linkport archives to sign")
+		return fmt.Errorf("no Linkport desktop archives to sign")
 	}
+	var metadata strings.Builder
 	for _, archive := range archives {
 		file, err := os.Open(archive)
 		if err != nil {
@@ -89,11 +85,15 @@ func run(generate, directory string) error {
 		if closeErr != nil {
 			return closeErr
 		}
-		signature := ed25519.Sign(private, digest.Sum(nil))
-		if err := os.WriteFile(archive+".sig", []byte(base64.StdEncoding.EncodeToString(signature)+"\n"), 0o644); err != nil {
-			return err
-		}
-		fmt.Println(filepath.Base(archive) + ".sig")
+		sum := digest.Sum(nil)
+		signature := ed25519.Sign(private, sum)
+		name := filepath.Base(archive)
+		fmt.Fprintf(&metadata, "%x  %s\n# ed25519 %s %s\n",
+			sum, name, base64.StdEncoding.EncodeToString(signature), name)
 	}
+	if err := os.WriteFile(filepath.Join(directory, "desktop-checksums.txt"), []byte(metadata.String()), 0o644); err != nil {
+		return err
+	}
+	fmt.Println("desktop-checksums.txt")
 	return nil
 }

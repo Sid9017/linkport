@@ -96,7 +96,7 @@ jobs:
           LINKPORT_UPDATE_PUBLIC_KEY: ${{ secrets.LINKPORT_UPDATE_PUBLIC_KEY }}
         run: |
           python - <<'PY'
-          import hashlib, os
+          import os
           from pathlib import Path
           import sys
           sys.path.insert(0, "scripts")
@@ -106,8 +106,6 @@ jobs:
           actual = {p.name for p in Path("dist/desktop").glob("*.zip")}
           if actual != names:
               raise SystemExit(f"desktop archive mismatch: {actual ^ names}")
-          lines = [f"{hashlib.sha256((Path('dist/desktop') / name).read_bytes()).hexdigest()}  {name}\n" for name in sorted(names)]
-          Path("dist/desktop/desktop-checksums.txt").write_text("".join(lines), encoding="utf-8")
           PY
           test -n "$LINKPORT_UPDATE_PRIVATE_KEY"
           test -n "$LINKPORT_UPDATE_PUBLIC_KEY"
@@ -128,7 +126,6 @@ jobs:
             --verify-tag --draft "${args[@]}" --target "$RELEASE_COMMIT" \
             --title "Linkport $RELEASE_TAG · $RELEASE_CHANNEL" \
             --notes-file dist/release-notes.md
-          gh release upload "$RELEASE_TAG" dist/desktop/*.sig
           latest=false
           if [[ "$RELEASE_CHANNEL" == "stable" ]]; then latest=true; fi
           gh release edit "$RELEASE_TAG" --draft=false --latest="$latest"

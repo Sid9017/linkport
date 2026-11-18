@@ -5,8 +5,10 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -26,15 +28,29 @@ func TestReleaseSignatureAuthenticatesSHA256Digest(t *testing.T) {
 	if err := run("", directory); err != nil {
 		t.Fatal(err)
 	}
-	encoded, err := os.ReadFile(archive + ".sig")
+	metadata, err := os.ReadFile(filepath.Join(directory, "desktop-checksums.txt"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	signature, err := base64.StdEncoding.DecodeString(string(encoded))
+	lines := strings.Split(strings.TrimSpace(string(metadata)), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("unexpected checksum metadata: %q", metadata)
+	}
+	fields := strings.Fields(lines[1])
+	if len(fields) != 4 || fields[0] != "#" || fields[1] != "ed25519" || fields[3] != filepath.Base(archive) {
+		t.Fatalf("invalid inline signature: %q", lines[1])
+	}
+	signature, err := base64.StdEncoding.DecodeString(fields[2])
 	if err != nil {
 		t.Fatal(err)
 	}
 	digest := sha256.Sum256(contents)
+	if lines[0] != fmt.Sprintf("%x  %s", digest, filepath.Base(archive)) {
+		t.Fatalf("invalid checksum: %q", lines[0])
+	}
+	if _, err := os.Stat(archive + ".sig"); !os.IsNotExist(err) {
+		t.Fatal("standalone signature file was created")
+	}
 	if !ed25519.Verify(public, digest[:], signature) {
 		t.Fatal("release signature does not authenticate the digest")
 	}
