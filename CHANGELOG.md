@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.0.7 — native desktop packages and reliable updates
+
+- Ship macOS DMG, Windows EXE and Debian/Ubuntu DEB desktop packages for both architectures, with the CLI embedded and no ZIP or standalone signature assets.
+- Select and verify updates for the running OS and architecture; prepare macOS bundles from verified DMGs and hand Linux package installation to the system installer.
+- Migrate from 0.0.6 or earlier with one manual installation of this release.
+
+- Keep update checks bounded to thirty seconds while allowing downloads up to
+  thirty minutes, with cancellation and streaming verification preserved.
+- Show check/download timeouts, verification, staging and restart failures
+  separately in Chinese and English, and display download percentages.
+- Derive failure state from the completed operation so delayed error events
+  cannot overwrite a retry; clear previous errors and progress before retrying.
+
 ## 0.0.6 — compatible desktop update packages
 
 - Package exactly one application payload per Desktop ZIP: Linkport.app on

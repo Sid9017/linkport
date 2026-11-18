@@ -1214,6 +1214,9 @@
     "正在校验": "Verifying",
     "准备更新": "Preparing update",
     "更新已就绪": "Update ready",
+    "安装包已校验，点击打开安装器": "Package verified; open installer",
+    "请在系统安装器中完成安装后重新启动": "Complete installation in the system installer, then relaunch",
+    "打开安装器": "Open installer",
     "发现新版本": "New version available",
     "下载更新": "Download update",
     "检查更新": "Check for updates",
@@ -1229,7 +1232,15 @@
     "随应用更新": "Updated with the app",
     "本地构建，不自动更新": "Local build; automatic updates disabled",
     "本地构建": "Local build",
-    "更新服务暂不可用，请稍后重试": "Update service unavailable; try again later",
+    "更新失败，请重试": "Update failed. Please try again.",
+    "检查更新超时，请重试": "Update check timed out. Please try again.",
+    "无法检查更新，请重试": "Could not check for updates. Please try again.",
+    "下载超时，请检查网络后重试": "Download timed out. Check your connection and try again.",
+    "下载失败，请检查网络后重试": "Download failed. Check your connection and try again.",
+    "更新校验失败，请重新下载": "Update verification failed. Download the update again.",
+    "准备更新失败，请重试": "Could not prepare the update. Please try again.",
+    "重启更新失败，请重试": "Could not restart to update. Please try again.",
+    "更新已取消": "Update cancelled.",
     "当前使用东京公共中继，节点随应用更新。": "The Tokyo public relay is included and updated with the app.",
     "使用 Linkport 维护的公共中继与协同发现。": "Use Linkport public relays and peer-assisted discovery.",
     "设备与串口": "Devices and ports",
@@ -1367,17 +1378,20 @@
       [updateState, relayUpdateState] = await Promise.all([nativeRequest("update"), nativeRequest("relay-update")]);
       if (updateState.version) all("[data-app-version]").forEach(node=>{node.textContent=updateState.version;node.title=updateState.version;});
       find("[data-app-channel]").textContent=({stable:"Stable",nightly:"Nightly",dev:"本地构建"})[updateState.channel] || "";
-      const labels = { development:"本地构建，不自动更新", unconfigured: "发布签名未配置", idle: "检查更新", checking: "正在检查更新", "up-to-date": "当前没有可用更新", available: "发现新版本", downloading: "正在下载", verifying: "正在校验", installing: "准备更新", ready: "更新已就绪", error: "更新服务暂不可用，请稍后重试" };
-      find("[data-update-status]").textContent = (labels[updateState.state] || updateState.state) + (updateState.next ? " · " + updateState.next : "");
+      const labels = { development:"本地构建，不自动更新", unconfigured: "发布签名未配置", idle: "检查更新", checking: "正在检查更新", "up-to-date": "当前没有可用更新", available: "发现新版本", downloading: "正在下载", verifying: "正在校验", installing: "准备更新", ready: "更新已就绪", "package-ready": "安装包已校验，点击打开安装器", "installer-opened": "请在系统安装器中完成安装后重新启动", error: "更新失败，请重试" };
+      const errorLabels = { "check-timeout":"检查更新超时，请重试", "check-failed":"无法检查更新，请重试", "download-timeout":"下载超时，请检查网络后重试", "download-failed":"下载失败，请检查网络后重试", "verification-failed":"更新校验失败，请重新下载", "install-failed":"准备更新失败，请重试", "restart-failed":"重启更新失败，请重试", cancelled:"更新已取消" };
+      const statusLabel = updateState.errorCode ? errorLabels[updateState.errorCode] || labels.error : labels[updateState.state] || updateState.state;
+      const progress = updateState.state === "downloading" && Number.isFinite(updateState.progress) && updateState.progress > 0 ? " · " + Math.round(Math.min(1, updateState.progress) * 100) + "%" : "";
+      find("[data-update-status]").textContent = statusLabel + progress + (updateState.next ? " · " + updateState.next : "");
       const relayLabels={bundled:"随应用更新",idle:"等待检查",checking:"正在检查更新","up-to-date":"已是最新配置",available:"有中继配置更新",error:"检查失败",unavailable:"暂不可用"};
       find("[data-relay-update-status]").textContent=(relayLabels[relayUpdateState.state] || relayUpdateState.state)+" · v"+(relayUpdateState.version || 0)+(relayUpdateState.error ? " · "+relayUpdateState.error : "");
       find("[data-relay-update-action]").textContent=relayUpdateState.state==="available" ? "更新中继配置" : "检查更新";
       find("[data-relay-update-action]").hidden=relayUpdateState.state==="bundled";
       find("[data-relay-update-action]").disabled=["bundled","checking","unavailable"].includes(relayUpdateState.state);
-      find("[data-update-badge]").hidden=!["available","ready"].includes(updateState.state) && relayUpdateState.state!=="available";
+      find("[data-update-badge]").hidden=!["available","ready","package-ready","installer-opened"].includes(updateState.state) && relayUpdateState.state!=="available";
       const button = find("[data-update-action]");
       button.disabled = !updateState.configured || ["checking", "downloading", "verifying", "installing"].includes(updateState.state);
-      button.setAttribute("aria-label", updateState.state === "ready" ? "重启并更新" : updateState.state === "available" ? "下载更新" : "检查更新");
+      button.setAttribute("aria-label", ["package-ready","installer-opened"].includes(updateState.state) ? "打开安装器" : updateState.state === "ready" ? "重启并更新" : updateState.state === "available" ? "下载更新" : "检查更新");
     } catch { find("[data-update-status]").textContent = "操作失败，请重试"; }
   }
   function openSettings() {
@@ -1565,7 +1579,7 @@
       find("[data-update-status]").textContent = "桌面版中检查更新";
       return;
     }
-    const operation = updateState.state === "ready" ? "restart" : updateState.state === "available" ? "download" : "check";
+    const operation = ["ready","package-ready","installer-opened"].includes(updateState.state) ? "restart" : updateState.state === "available" ? "download" : "check";
     try { await nativeRequest("update/" + operation, "POST"); refreshUpdate(); }
     catch { find("[data-update-status]").textContent = "操作失败，请重试"; }
   });

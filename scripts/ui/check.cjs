@@ -787,6 +787,37 @@ async function checkApplicationUpdates(page, browserName) {
   await page.screenshot({ path: path.join(output, `${browserName}-nightly-update-ready.png`) });
   await page.locator("[data-update-action]").click();
   assert.equal(restarted, true);
+  for (const [code, message] of [
+    ["check-timeout", "检查更新超时"],
+    ["download-timeout", "下载超时"],
+    ["verification-failed", "更新校验失败"],
+    ["install-failed", "准备更新失败"],
+  ]) {
+    update = { ...update, state: "error", errorCode: code, error: "Get https://private.example/archive?token=fixture-only: failed" };
+    await page.waitForFunction(message => document.querySelector("[data-update-status]").textContent.includes(message), message);
+    const status = await page.locator("[data-update-status]").innerText();
+    assert.equal(status.includes("private.example"), false, "raw download URLs must not be displayed");
+    assert.equal(status.includes("服务暂不可用"), false);
+    assert.equal(await page.locator("[data-update-action]").isDisabled(), false);
+  }
+  await page.locator('[data-preference="language"]').selectOption("en");
+  update = { ...update, state: "error", errorCode: "download-timeout" };
+  await page.waitForFunction(() => document.querySelector("[data-update-status]").textContent.includes("Download timed out"));
+  await page.screenshot({ path: path.join(output, `${browserName}-update-download-timeout.png`) });
+  update = { ...update, state: "downloading", errorCode: "", error: "", progress: 0.42 };
+  await page.waitForFunction(() => document.querySelector("[data-update-status]").textContent.includes("Downloading · 42%"));
+  assert.equal(await page.locator("[data-update-action]").isDisabled(), true);
+  await page.screenshot({ path: path.join(output, `${browserName}-update-download-progress.png`) });
+  update = { ...update, state: "package-ready", errorCode: "", error: "" };
+  await page.waitForFunction(() => document.querySelector("[data-update-status]").textContent.includes("Package verified"));
+  assert.equal(await page.locator("[data-update-action]").getAttribute("aria-label"), "Open installer");
+  restarted = false;
+  await page.locator("[data-update-action]").click();
+  assert.equal(restarted, true, "verified DEB must use the installer action");
+  update.state = "installer-opened";
+  await page.waitForFunction(() => document.querySelector("[data-update-status]").textContent.includes("Complete installation"));
+  assert.equal(await page.locator("[data-update-action]").isDisabled(), false);
+  await page.locator('[data-preference="language"]').selectOption("zh-CN");
   update = { configured: false, state: "development", version: "0.0.2-dev.1794913200.g012345abcdef", channel: "dev" };
   await page.reload({ waitUntil: "networkidle" });
   await page.locator("[data-settings-open]").click();

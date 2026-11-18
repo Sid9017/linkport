@@ -121,20 +121,14 @@
   "选择渠道": "Choose a channel",
   "下载与更新只有两个渠道：Stable（正式版）和 Nightly（开发预览）。Nightly 的版本号包含时间和构建编号。两个渠道各自只接收同渠道的新版本，切换渠道需要下载对应安装包。升级保留本机身份与已配对设备。自行从源码编译的版本标为“本地构建”，包含提交标识，不自动更新。": "Downloads and updates have two channels: Stable and Nightly. Nightly versions include a timestamp and build number. Each channel only receives newer versions from the same channel; switching requires downloading the corresponding package. Updates preserve your device identity and pairings. Source builds are marked as local builds, include a commit identifier and do not update automatically.",
   "选择系统与架构": "Choose your system and architecture",
-  "macOS：14.5 及以上，选择 Apple Silicon 或 Intel。解压并把 Linkport.app 放进“应用程序”。当前包有本地签名，但未经 Apple 公证，系统可能提示无法验证开发者；是否允许运行由你判断。": "macOS: 14.5 or later. Choose Apple Silicon or Intel. Extract the ZIP and move Linkport.app to Applications. Current builds are ad-hoc signed but not notarized by Apple. macOS may report an unverified developer; decide whether to allow the app to run.",
-  "Windows：解压 ZIP 并启动 Linkport.exe。远端映射需要自行安装兼容的 com0com 驱动，并预先配置一对互连端口。ARM64 的驱动兼容性仍待实机验证。": "Windows: extract the ZIP and launch Linkport.exe. Remote mapping requires a compatible com0com driver and a preconfigured connected port pair. ARM64 driver compatibility still needs verification on real hardware.",
-  "Linux：解压 ZIP 并运行 linkport-desktop，需要 GTK 4 与 WebKitGTK 6。发行版、桌面环境和串口权限需要在目标系统确认。": "Linux: extract the ZIP and run linkport-desktop. GTK 4 and WebKitGTK 6 are required. Check distribution support, desktop integration and serial permissions on the target system.",
   "各平台的构建与隔离测试不代表所有 USB 串口、NAT 或驱动均已验收。macOS/Linux PTY 不透传 DTR/RTS；当前不支持硬件流控与持续 BREAK。": "Platform builds and isolated tests do not certify every USB serial device, NAT environment or driver. macOS and Linux PTYs do not forward DTR/RTS. Hardware flow control and continuous BREAK are not currently supported.",
   "三步开始": "Get started in three steps",
   "两台机器都启动 Linkport。在“设备与配对”生成邀请，复制完整内容，在另一台机器导入。邀请有效期为八小时、只能使用一次；重新生成或退出邀请方进程会使旧邀请失效。": "Launch Linkport on both machines. Generate an invitation in Devices and pairing, copy it in full and import it on the other machine. Invitations last eight hours and can be used once. Regenerating an invitation or quitting the inviting process invalidates the previous invitation.",
   "在共享端的“共享”页面勾选目标串口。新插入的设备默认不共享，远端不能替你开启。": "On the sharing device, select the port on the Share page. Newly plugged-in devices are not shared by default, and remote peers cannot enable sharing for you.",
   "在使用端选择机器、串口和波特率，连接成功后用原有串口工具打开本机 PTY/com0com 映射。也可以直接使用 Linkport 的监听、发送和日志导出。": "On your machine, choose the device, port and baud rate. After connecting, open the local PTY/com0com mapping with your existing serial tool. You can also monitor, send and export logs directly in Linkport.",
   "更新与校验": "Updates and verification",
-  "如果仍在使用 0.0.1，请先手动下载安装 0.0.2 或后续版本一次，以切换到新的更新服务。": "If you still use 0.0.1, manually install 0.0.2 or a later version once to switch to the new update service.",
   "下载区提供 SHA-256 校验文件。macOS/Linux 可以使用": "SHA-256 checksums are provided in the download section. On macOS/Linux, use",
-  "shasum -a 256 文件.zip": "shasum -a 256 file.zip",
   "，Windows 可以使用": "; on Windows, use",
-  "Get-FileHash 文件.zip -Algorithm SHA256": "Get-FileHash file.zip -Algorithm SHA256",
   "。应用更新签名与 Apple 公证、Windows Authenticode 属于不同机制。": ". Update signatures are separate from Apple notarization and Windows Authenticode.",
   "连接、权限和日志": "Connections, permissions and logs",
   "当前版本内置东京公共中继，节点随应用更新，也可选择仅直连模式。网络模式改变后需要重启。底层尝试直连，必要时转发密文，实际可达性取决于网络条件。串口数据会话真正断开后需要手动重新连接。": "The app includes a Tokyo public relay, updated with the app, and offers direct-only mode. Restart after changing network mode. The transport tries direct connections and relays encrypted traffic when necessary. Reachability depends on network conditions. Reconnect disconnected serial sessions manually.",
@@ -162,7 +156,13 @@
   "Stable 是正式发布渠道，Nightly 是持续开发的预览渠道。0.0.x 仍处于早期阶段，硬件和驱动兼容性以说明为准。": "Stable is the official release channel. Nightly previews ongoing development. The 0.0.x series is still early; consult the notes for hardware and driver limitations.",
   "获取桌面版 →": "Get Desktop →",
   "语言": "Language",
-  "Stable 和 Nightly 在启动三十秒后检查新版本，此后每分钟检查一次；设置里可以手动检查。关闭后台自动更新仍会显示更新提示。安装包需要通过 SHA-256 和维护者 Ed25519 签名校验，暂存完成后由你选择重启更新。本地构建不检查或替换自己。": "Stable and Nightly check for updates thirty seconds after launch, then every minute. You can also check manually in Settings. Disabling automatic updates still allows update notifications. Packages must pass SHA-256 and publisher Ed25519 verification. Once staged, you choose when to restart and update. Local builds do not check for or replace themselves."
+  "Stable 和 Nightly 在启动三十秒后检查新版本，此后每分钟检查一次；设置里可以手动检查。关闭后台自动更新仍会显示更新提示。安装包需要通过 SHA-256 和维护者 Ed25519 签名校验，暂存完成后由你选择重启更新。本地构建不检查或替换自己。": "Stable and Nightly check for updates thirty seconds after launch, then every minute. You can also check manually in Settings. Disabling automatic updates still allows update notifications. Packages must pass SHA-256 and publisher Ed25519 verification. Once staged, you choose when to restart and update. Local builds do not check for or replace themselves.",
+  "macOS：14.5 及以上，选择 Apple Silicon 或 Intel。打开 DMG 并把 Linkport.app 拖入“应用程序”。当前包有本地签名，但未经 Apple 公证，系统可能提示无法验证开发者；是否允许运行由你判断。": "macOS: 14.5 or later. Choose Apple Silicon or Intel. Open the DMG and drag Linkport.app to Applications. Current builds are ad-hoc signed but not notarized by Apple. macOS may report an unverified developer; decide whether to allow the app to run.",
+  "Windows：直接运行下载的 EXE，内含命令行工具。远端映射需要自行安装兼容的 com0com 驱动，并预先配置一对互连端口。ARM64 的驱动兼容性仍待实机验证。": "Windows: run the downloaded EXE directly; the CLI is embedded. Remote mapping requires a compatible com0com driver and a preconfigured connected port pair. ARM64 driver compatibility still needs verification on real hardware.",
+  "Linux：Debian/Ubuntu 使用 DEB，通过系统安装器安装，或运行 sudo apt install ./下载的文件.deb。需要 GTK 4 与 WebKitGTK 6。升级时在应用内打开已校验的安装包，在系统安装器中完成安装后重新启动应用。": "Linux: install the DEB on Debian/Ubuntu with the system installer or sudo apt install ./downloaded-file.deb. GTK 4 and WebKitGTK 6 are required. For updates, open the verified package from the app, complete installation in the system installer, then relaunch.",
+  "0.0.6 及更早版本需要手动安装一次 0.0.7 或更新版本，以切换到原生安装包。之后升级会自动匹配当前系统与架构。": "If you use 0.0.6 or earlier, manually install 0.0.7 or later once to migrate from ZIP updates to native packages. Later updates select the package matching your operating system and architecture.",
+  "shasum -a 256 下载的文件": "shasum -a 256 downloaded-file",
+  "Get-FileHash 下载的文件 -Algorithm SHA256": "Get-FileHash downloaded-file -Algorithm SHA256"
 };
 
   const chinese = new Map(Object.entries(messages).map(([cn, en]) => [en, cn]));

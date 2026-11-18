@@ -81,7 +81,10 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.os }}-${{ matrix.arch }}
-          path: dist/desktop/*.zip
+          path: |
+            dist/desktop/*.dmg
+            dist/desktop/*.exe
+            dist/desktop/*.deb
           if-no-files-found: error
           compression-level: 0
           retention-days: 7

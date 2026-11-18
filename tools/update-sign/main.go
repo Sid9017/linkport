@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -63,10 +64,15 @@ func run(generate, directory string) error {
 	if expected != "" && expected != base64.StdEncoding.EncodeToString(public) {
 		return fmt.Errorf("signing private key does not match the embedded public key")
 	}
-	archives, err := filepath.Glob(filepath.Join(directory, "linkport-desktop_*.zip"))
-	if err != nil {
-		return err
+	var archives []string
+	for _, extension := range []string{"dmg", "exe", "deb", "zip"} {
+		files, err := filepath.Glob(filepath.Join(directory, "linkport-desktop_*."+extension))
+		if err != nil {
+			return err
+		}
+		archives = append(archives, files...)
 	}
+	sort.Strings(archives)
 	if len(archives) == 0 {
 		return fmt.Errorf("no Linkport desktop archives to sign")
 	}

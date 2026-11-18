@@ -104,3 +104,24 @@ test("absent channels return 204 while an upstream outage remains an error", asy
   const response = await handler(new Request("https://example.com/api/releases"));
   assert.deepEqual(await response.json(), { stable: null, nightly: null });
 });
+
+test("native releases publish only the package matching each platform and architecture", async () => {
+  const { publicKey, privateKey } = generateKeyPairSync("ed25519");
+  const r = release("v0.0.7");
+  const digest = createHash("sha256").update("native fixture").digest();
+  const signature = sign(null, digest, privateKey).toString("base64");
+  const lines = [];
+  for (const [platform, extension] of Object.entries({ darwin: "dmg", windows: "exe", linux: "deb" })) {
+    for (const arch of ["amd64", "arm64"]) {
+      const filename = `linkport-desktop_0.0.7_${platform}_${arch}.${extension}`;
+      r.assets.push({ name: filename, size: 20 });
+      lines.push(`${digest.toString("hex")}  ${filename}`, `# ed25519 ${signature} ${filename}`);
+      assert.equal(isDownloadAsset(r.tag_name, filename), true);
+      assert.equal(isDownloadAsset(r.tag_name, filename.replace(`.${extension}`, platform === "darwin" ? ".exe" : ".dmg")), false);
+    }
+  }
+  r.assets.push({ name: "desktop-checksums.txt" });
+  const result = await publicRelease(r, async () => lines.join("\n"), publicKey);
+  assert.deepEqual(result.artifacts.map(a => a.filetype), ["dmg", "dmg", "deb", "deb", "exe", "exe"]);
+  assert.equal(result.artifacts.length, 6);
+});

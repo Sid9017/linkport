@@ -45,11 +45,13 @@ python3 scripts/desktop.py --output dist/desktop-dev
 ```
 
 Names identify both program and complete version:
-`linkport-desktop_VERSION_GOOS_GOARCH.zip` for desktop;
+`linkport-desktop_VERSION_darwin_GOARCH.dmg`,
+`linkport-desktop_VERSION_windows_GOARCH.exe`, and
+`linkport-desktop_VERSION_linux_GOARCH.deb` for desktop;
 `linkport_VERSION_GOOS_GOARCH.tar.gz` for Unix CLI or `.zip` for Windows CLI.
-Desktop ZIPs contain exactly one top-level payload: `Linkport.app` on macOS,
-`Linkport.exe` on Windows, or `linkport-desktop` on Linux. This is required by
-the Wails updater. Version/channel metadata and the bundled CLI remain embedded
+Desktop packages contain `Linkport.app` in a DMG on macOS,
+the versioned GUI EXE on Windows, or `/usr/bin/linkport-desktop` and a desktop
+launcher in a Debian package on Linux. Version/channel metadata and the bundled CLI remain embedded
 in the executable; the font license remains embedded with the font assets.
 CLI-only CI archives also include `VERSION`, `CHANNEL`, documentation and
 dependency licenses.
@@ -125,6 +127,11 @@ links. No repository visibility change or new repository is required.
 Desktop pins the publisher key and uses the same public manifests, checks the
 channel and semantic version, verifies the signed digest before offering an
 update, then verifies downloaded bytes before staging. Restart remains explicit.
+Version checks have a 30-second deadline. Downloads have a separate 30-minute
+deadline and remain cancellable; a short HTTP-client timeout must not abort a
+healthy slow transfer. The UI shows download progress and distinguishes check,
+download, verification, staging and restart failures without displaying raw
+download URLs.
 Disabling automatic downloads keeps version checks active. Unpublished local builds never
 replace themselves. Test a real upgrade separately from provider/fixture tests.
 Users of 0.0.1 must manually install 0.0.2 or later once to switch to the new
@@ -139,7 +146,7 @@ original run's source and successful checks before reusing its artifacts. The
 corrected packaging fixture runs from the recovery workflow revision outside
 the checkout; application builds still use the original clean, immutable tag.
 
-New published releases upload the six `linkport-desktop_*.zip` archives and
+New published releases upload two DMGs, two EXEs, two DEBs and
 `desktop-checksums.txt`, with no standalone `.sig` files. Each checksum line
 is followed by `# ed25519 BASE64_SIGNATURE FILENAME`; the signature authenticates
 the raw SHA-256 digest. The public gateway verifies these inline signatures and
@@ -149,3 +156,16 @@ The desktop build embeds the corresponding console CLI; its first normal launch
 registers the user command as described in [desktop.md](desktop.md#bundled-command-line-tool).
 Update signatures remain required by the public download service and updater.
 Existing published releases are not modified by this workflow change.
+
+
+Native package updates (0.0.7+): the gateway and client bind each artifact to
+its OS, architecture, version and package extension. macOS verifies the DMG,
+mounts it read-only, validates the bundle identity/version/code signature and
+stages the app for the existing restart helper. Windows verifies and replaces
+the standalone GUI EXE. Linux stages and verifies the DEB in the user's cache,
+checks its Debian package identity/version/architecture and opens the system
+installer on explicit user action. The Linux app stays running; complete the
+system installation and relaunch it. This can require system authorization.
+Clients through 0.0.6 require one manual installation to migrate from ZIPs.
+Publisher signatures remain embedded in checksum metadata; no standalone SIG
+or ZIP assets are uploaded in native-format releases.

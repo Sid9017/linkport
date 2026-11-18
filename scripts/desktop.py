@@ -18,6 +18,79 @@ import release
 ROOT = Path(__file__).resolve().parents[1]
 DESKTOP = ROOT / "desktop"
 IDENTIFIER = "com.linkport.desktop"
+FORMATS = {"darwin": "dmg", "windows": "exe", "linux": "deb"}
+
+def archive_name(version, system, arch):
+    extension = FORMATS[system]
+    return f"linkport-desktop_{version}_{system}_{arch}.{extension}"
+
+
+def mac_disk_image(bundle, destination, env):
+    with tempfile.TemporaryDirectory(prefix="linkport-dmg-") as directory:
+        contents = Path(directory)
+        shutil.copytree(bundle, contents / "Linkport.app")
+        (contents / "Applications").symlink_to("/Applications", target_is_directory=True)
+        subprocess.run([
+            "hdiutil", "create", "-quiet", "-volname", "Linkport",
+            "-srcfolder", str(contents), "-fs", "HFS+", "-format", "UDZO", "-ov", str(destination),
+        ], check=True, env=env)
+    subprocess.run(["hdiutil", "verify", "-quiet", str(destination)], check=True, env=env)
+
+def linux_package(binary, destination, version, arch, env):
+    with tempfile.TemporaryDirectory(prefix="linkport-deb-") as directory:
+        root = Path(directory)
+        installed = root / "usr/bin/linkport-desktop"
+        installed.parent.mkdir(parents=True)
+        shutil.copy2(binary, installed)
+        installed.chmod(0o755)
+        control = root / "DEBIAN/control"
+        control.parent.mkdir()
+        control.write_text(
+            "Package: linkport\n"
+            f"Version: {version.replace('-', '~', 1)}\n"
+            f"Architecture: {arch}\n"
+            "Maintainer: Linkport contributors <Sid9017@users.noreply.github.com>\n"
+            "Section: utils\nPriority: optional\n"
+            "Depends: libc6, libgtk-4-1, libwebkitgtk-6.0-4, xdg-utils\n"
+            "Homepage: https://linkport.grezl.link\n"
+            "Description: Explicit serial sharing between paired devices\n"
+            " Share selected remote serial ports with your local debugging tools.\n",
+            encoding="utf-8",
+        )
+        launcher = root / "usr/share/applications/linkport.desktop"
+        launcher.parent.mkdir(parents=True)
+        launcher.write_text(
+            "[Desktop Entry]\nType=Application\nName=Linkport\n"
+            "Exec=linkport-desktop\nIcon=linkport\nTerminal=false\n"
+            "Categories=Development;Utility;\n", encoding="utf-8",
+        )
+        icon = root / "usr/share/icons/hicolor/256x256/apps/linkport.png"
+        icon.parent.mkdir(parents=True)
+        shutil.copy2(DESKTOP / "assets/app.png", icon)
+        subprocess.run(["dpkg-deb", "-Zgzip", "--build", "--root-owner-group", str(root), str(destination)],
+                       check=True, env=env)
+        subprocess.run(["dpkg-deb", "--info", str(destination)], check=True, env=env, stdout=subprocess.DEVNULL)
+
+
+def validate_archives(directory, version):
+    expected = {archive_name(version, system, arch) for system, arch in release.TARGETS}
+    actual = {item.name for item in directory.iterdir() if item.suffix in (".zip", ".dmg", ".exe", ".deb")}
+    if actual != expected:
+        raise ValueError(f"desktop archive mismatch: {actual ^ expected}")
+    for system, arch in release.TARGETS:
+        artifact = directory / archive_name(version, system, arch)
+        if system == "darwin":
+            with artifact.open("rb") as stream:
+                stream.seek(-512, 2)
+                if stream.read(4) != b"koly":
+                    raise ValueError(f"invalid UDIF disk image: {artifact.name}")
+            continue
+        with artifact.open("rb") as stream:
+            signature = stream.read(8)
+        if system == "windows" and signature[:2] != b"MZ":
+            raise ValueError(f"invalid Windows executable: {artifact.name}")
+        if system == "linux" and signature != b"!<arch>\n":
+            raise ValueError(f"invalid Debian package: {artifact.name}")
 
 
 def go_output(go, *arguments, env):
@@ -136,6 +209,7 @@ def build(output, expected_target, go, tag):
         staging = Path(temporary)
         binary = staging / ("Linkport.exe" if system == "windows" else "linkport-desktop")
         build_executables(go, env, flags, binary)
+        archive = output / archive_name(version, system, arch)
         if system == "darwin":
             bundle = mac_bundle(staging, binary, base, env)
             destination = output / "Linkport.app"
@@ -145,24 +219,18 @@ def build(output, expected_target, go, tag):
                     raise ValueError("refusing to replace an application not owned by Linkport")
                 shutil.rmtree(destination)
             shutil.copytree(bundle, destination)
-            entries = [
-                (str(item.relative_to(staging)), item.read_bytes(), item.stat().st_mode & 0o777)
-                for item in sorted(bundle.rglob("*")) if item.is_file()
-            ]
+            mac_disk_image(bundle, archive, env)
+        elif system == "windows":
+            shutil.copy2(binary, archive)
         else:
-            shutil.copy2(binary, output / binary.name)
-            entries = [(binary.name, binary.read_bytes(), 0o755)]
-        # Wails replaces one application payload per update. Extra top-level
-        # documentation or metadata would make its archive extractor reject it.
-        archive = output / f"linkport-desktop_{version}_{system}_{arch}.zip"
-        release.write_archive(archive, entries, epoch)
+            linux_package(binary, archive, version, arch, env)
     write_checksums(output)
     print(f"{archive}\ncommit={commit}")
 
 
 def write_checksums(output):
     lines = []
-    for archive in sorted(output.glob("*.zip")):
+    for archive in sorted(item for item in output.iterdir() if item.name.startswith("linkport-desktop_") and item.suffix in (".dmg", ".exe", ".deb")):
         if archive.is_file():
             digest = hashlib.sha256(archive.read_bytes()).hexdigest()
             lines.append(f"{digest}  {archive.name}\n")

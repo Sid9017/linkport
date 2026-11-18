@@ -77,3 +77,52 @@ func TestGenerateRefusesToOverwritePrivateKey(t *testing.T) {
 		t.Fatal("private key changed")
 	}
 }
+
+func TestNativePackageSignaturesStayInline(t *testing.T) {
+	public, private, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("LINKPORT_UPDATE_PRIVATE_KEY", base64.StdEncoding.EncodeToString(private))
+	t.Setenv("LINKPORT_UPDATE_PUBLIC_KEY", base64.StdEncoding.EncodeToString(public))
+	directory := t.TempDir()
+	names := []string{}
+	for platform, extension := range map[string]string{"darwin": "dmg", "windows": "exe", "linux": "deb"} {
+		for _, arch := range []string{"amd64", "arm64"} {
+			name := "linkport-desktop_0.0.7_" + platform + "_" + arch + "." + extension
+			names = append(names, name)
+			if err := os.WriteFile(filepath.Join(directory, name), []byte(name), 0600); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if err := run("", directory); err != nil {
+		t.Fatal(err)
+	}
+	metadata, err := os.ReadFile(filepath.Join(directory, "desktop-checksums.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(metadata)), "\n")
+	if len(lines) != 12 {
+		t.Fatal("expected six inline signatures")
+	}
+	for i := 0; i < len(lines); i += 2 {
+		fields := strings.Fields(lines[i+1])
+		if len(fields) != 4 {
+			t.Fatal("invalid signature metadata")
+		}
+		signature, err := base64.StdEncoding.DecodeString(fields[2])
+		if err != nil {
+			t.Fatal(err)
+		}
+		digest := sha256.Sum256([]byte(fields[3]))
+		if !ed25519.Verify(public, digest[:], signature) {
+			t.Fatal("native signature rejected")
+		}
+	}
+	files, err := os.ReadDir(directory)
+	if err != nil || len(files) != 7 {
+		t.Fatal("unexpected release assets")
+	}
+}

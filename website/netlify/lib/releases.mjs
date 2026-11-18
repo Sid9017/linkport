@@ -7,6 +7,7 @@ const key = createPublicKey({
   format: "der", type: "spki",
 });
 export const tagPattern = /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(-nightly\.\d{14}\.[1-9]\d*)?$/;
+const formats = { darwin: "dmg", windows: "exe", linux: "deb" };
 const targets = ["darwin_amd64", "darwin_arm64", "linux_amd64", "linux_arm64", "windows_amd64", "windows_arm64"];
 
 export function releaseChannel(release) {
@@ -48,17 +49,19 @@ export async function publicRelease(release, readAsset, verificationKey = key) {
   const signatures = new Map();
   for (const line of (await readAsset(checksumAsset)).trim().split("\n")) {
     if (line.startsWith("# ed25519 ")) {
-      const match = /^# ed25519 ([A-Za-z0-9+/]{86}==) (linkport-desktop_[^\s/\\]+\.zip)$/.exec(line);
+      const match = /^# ed25519 ([A-Za-z0-9+/]{86}==) (linkport-desktop_[^\s/\\]+\.(?:zip|dmg|exe|deb))$/.exec(line);
       if (!match || signatures.has(match[2])) throw new Error("invalid release signatures");
       signatures.set(match[2], match[1]);
       continue;
     }
-    const match = /^([a-f0-9]{64})  (linkport-desktop_[^\s/\\]+\.zip)$/.exec(line);
+    const match = /^([a-f0-9]{64})  (linkport-desktop_[^\s/\\]+\.(?:zip|dmg|exe|deb))$/.exec(line);
     if (!match || checksums.has(match[2])) throw new Error("invalid release checksums");
     checksums.set(match[2], match[1]);
   }
   const artifacts = await Promise.all(targets.map(async target => {
-    const filename = `linkport-desktop_${version}_${target}.zip`;
+    const platform = target.split("_")[0];
+    const filetype = assets.has(`linkport-desktop_${version}_${target}.${formats[platform]}`) ? formats[platform] : "zip";
+    const filename = `linkport-desktop_${version}_${target}.${filetype}`;
     const asset = assets.get(filename), signatureAsset = assets.get(filename + ".sig");
     const digest = checksums.get(filename);
     if (!asset || !digest || (!signatures.has(filename) && !signatureAsset)) throw new Error("incomplete desktop release");
@@ -69,9 +72,9 @@ export async function publicRelease(release, readAsset, verificationKey = key) {
     if (decoded.length !== 64 || !verify(null, Buffer.from(digest, "hex"), verificationKey, decoded)) {
       throw new Error("publisher signature rejected");
     }
-    const [platform, arch] = target.split("_");
+    const [, arch] = target.split("_");
     return {
-      platform, arch, filename, filetype: "zip", size: asset.size,
+      platform, arch, filename, filetype, size: asset.size,
       url: downloadURL(release.tag_name, filename),
       digestAlgo: "sha256", digest: Buffer.from(digest, "hex").toString("base64"),
       signatureAlgo: "ed25519", signature, sha256: digest,
@@ -93,6 +96,6 @@ export function isDownloadAsset(tag, filename) {
   if (["checksums.txt", "desktop-checksums.txt"].includes(filename)) return true;
   const version = tag.slice(1);
   return targets.some(target =>
-    [`linkport-desktop_${version}_${target}.zip`, `linkport_${version}_${target}${target.startsWith("windows") ? ".zip" : ".tar.gz"}`]
+    [`linkport-desktop_${version}_${target}.${formats[target.split("_")[0]]}`, `linkport-desktop_${version}_${target}.zip`, `linkport_${version}_${target}${target.startsWith("windows") ? ".zip" : ".tar.gz"}`]
       .some(name => filename === name || filename === name + ".sig"));
 }
